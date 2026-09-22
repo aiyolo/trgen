@@ -1,4 +1,5 @@
 mod excel;
+mod excel_reader;
 #[cfg(windows)]
 mod file_dialog;
 #[cfg(windows)]
@@ -48,6 +49,11 @@ fn save_text_file(path: String, content: String) -> Result<String, String> {
     }
     std::fs::write(&output_path, content).map_err(|error| format!("代码文件保存失败：{error}"))?;
     Ok(output_path.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+fn read_excel_document(path: String) -> Result<excel_reader::ExcelDocument, String> {
+    excel_reader::read_document(&path)
 }
 
 #[cfg(windows)]
@@ -116,7 +122,8 @@ pub fn run() {
         convert_table_to_xmacro,
         choose_table_path,
         choose_code_path,
-        save_text_file
+        save_text_file,
+        read_excel_document
     ]);
 
     #[cfg(windows)]
