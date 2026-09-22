@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f4f2ec" />
+    <title>StructSheet · C 结构体转 Excel</title>
+    <style>
+      html,
+      body,
+      #root {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+      }
+
+      body {
+        background: #f4f2ec;
+      }
+
+      .boot-screen {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: #28271f;
+        font-family: "Segoe UI", "Microsoft YaHei UI", sans-serif;
+      }
+
+      .boot-mark {
+        width: 54px;
+        height: 54px;
+        display: grid;
+        place-items: center;
+        margin-bottom: 16px;
+        border: 1px solid #cbbc00;
+        background: #f4e322;
+        box-shadow: 4px 4px 0 #28271f;
+        font: 700 22px "Cascadia Mono", Consolas, monospace;
+      }
+
+      .boot-title {
+        margin: 0 0 20px;
+        font-size: 18px;
+        font-weight: 700;
+      }
+
+      .boot-progress {
+        width: 240px;
+        height: 5px;
+        overflow: hidden;
+        background: #dedbd2;
+      }
+
+      .boot-progress-bar {
+        width: 12%;
+        height: 100%;
+        background: #28271f;
+        transition: width 180ms ease-out;
+      }
+
+      .boot-status {
+        margin-top: 9px;
+        color: #858178;
+        font-size: 11px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div class="boot-screen" role="status" aria-live="polite">
+        <div class="boot-mark">{ }</div>
+        <div class="boot-title">StructSheet</div>
+        <div class="boot-progress" aria-label="正在启动">
+          <div class="boot-progress-bar" id="boot-progress-bar"></div>
+        </div>
+        <div class="boot-status" id="boot-status">正在启动… 12%</div>
+      </div>
+    </div>
+    <script>
+      (() => {
+        let progress = 12;
+        const bar = document.getElementById("boot-progress-bar");
+        const status = document.getElementById("boot-status");
+        window.__structSheetBootTimer = window.setInterval(() => {
+          progress = Math.min(88, progress + Math.max(1, Math.round((90 - progress) / 7)));
+          if (bar) bar.style.width = `${progress}%`;
+          if (status) status.textContent = `正在启动… ${progress}%`;
+        }, 120);
+      })();
+    </script>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
