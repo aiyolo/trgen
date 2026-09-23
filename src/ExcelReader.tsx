@@ -74,6 +74,7 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
   const [imageZoom, setImageZoom] = useState(100);
   const readerBodyRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchResultsListRef = useRef<HTMLDivElement>(null);
   const pendingSearchDirection = useRef<1 | -1 | null>(null);
 
   const sheet = documentData?.sheets[activeSheetIndex] ?? null;
@@ -130,6 +131,7 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
     }
     return matches;
   }, [dataRows, searchTerm]);
+  const rowsByNumber = useMemo(() => new Map(dataRows.map((row) => [row.rowNumber, row])), [dataRows]);
   const searchResultCells = useMemo(() => new Set(searchResults.map((match) => `${match.rowNumber}:${match.column}`)), [searchResults]);
 
   useEffect(() => {
@@ -169,6 +171,13 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
     setSearchCursor(-1);
     setActiveCell("");
   }, [searchTerm]);
+
+  useEffect(() => {
+    if (searchCursor < 0) return;
+    searchResultsListRef.current
+      ?.querySelector(`[data-search-result="${searchCursor}"]`)
+      ?.scrollIntoView({ behavior: "instant", block: "nearest" });
+  }, [searchCursor]);
 
   useEffect(() => {
     if (pendingSearchDirection.current === null) return;
@@ -225,6 +234,20 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
     setSearchCursor(next);
     const match = searchResults[next];
     goToCell(match.rowNumber, match.column);
+  }
+
+  function selectSearchResult(index: number) {
+    const match = searchResults[index];
+    if (!match) return;
+    setSearchCursor(index);
+    goToCell(match.rowNumber, match.column);
+  }
+
+  function clearSearch() {
+    setSearchQuery("");
+    setSearchTerm("");
+    setSearchCursor(-1);
+    setActiveCell("");
   }
 
   function handleSearchKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
@@ -369,7 +392,7 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
                 <label className="reader-search">
                   <Search size={14} />
                   <input ref={searchInputRef} value={searchQuery} onKeyDown={handleSearchKeyDown} onChange={(event) => setSearchQuery(event.target.value)} placeholder="搜索当前工作表，Enter 下一处" />
-                  {searchQuery && <button title="清除搜索" onClick={() => setSearchQuery("")}><X size={13} /></button>}
+                  {searchQuery && <button title="清除搜索" onClick={clearSearch}><X size={13} /></button>}
                   <span>{searchTerm.trim() ? (searchResults.length ? `${searchCursor >= 0 ? searchCursor + 1 : 0} / ${searchResults.length}` : "无结果") : ""}</span>
                 </label>
                 <button className="reader-tool-icon" disabled={!searchResults.length} title="上一个匹配（Shift+Enter）" onClick={() => stepSearch(-1)}><ChevronLeft size={15} /></button>
@@ -381,6 +404,37 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
                 <button className={`reader-tool-icon ${wrap ? "active" : ""}`} title="自动换行" onClick={() => setWrap(!wrap)}><WrapText size={16} /></button>
                 <button className={`reader-tool-icon ${compact ? "active" : ""}`} title="紧凑行高" onClick={() => setCompact(!compact)}><Rows3 size={16} /></button>
               </div>
+
+              {searchTerm.trim() && (
+                <section className="search-results-panel" aria-label="全部搜索结果">
+                  <div className="search-results-heading">
+                    <div><Search size={13} /><strong>全部命中条目</strong></div>
+                    <span>{searchResults.length} 条</span>
+                  </div>
+                  {searchResults.length ? (
+                    <div ref={searchResultsListRef} className="search-results-list" aria-label="搜索结果列表">
+                      {searchResults.map((match, index) => {
+                        const cellText = rowsByNumber.get(match.rowNumber)?.cells[match.column] ?? "";
+                        const address = `${columnName(match.column)}${match.rowNumber}`;
+                        const header = sheet?.headers[match.column] || `第 ${match.column + 1} 列`;
+                        return (
+                          <button
+                            className={`search-result-item ${searchCursor === index ? "active" : ""}`}
+                            data-search-result={index}
+                            key={`${match.rowNumber}:${match.column}`}
+                            title={`${address} · ${header}\n${cellText}`}
+                            onClick={() => selectSearchResult(index)}
+                          >
+                            <span className="search-result-index">{index + 1}</span>
+                            <span className="search-result-location"><strong>{address}</strong><small>{header}</small></span>
+                            <span className="search-result-preview"><HighlightedText text={searchExcerpt(cellText, searchTerm)} query={searchTerm} /></span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : <div className="search-results-empty">当前工作表没有匹配内容。</div>}
+                </section>
+              )}
 
               {documentData.warnings.length > 0 && <div className="reader-warning" title={documentData.warnings.join("\n")}>{documentData.warnings[0]}</div>}
               {error && <div className="reader-error reader-inline-error">{error}</div>}
@@ -478,6 +532,18 @@ function suggestColumnWidths(sheet: ExcelSheet) {
 
 function visualLength(value: string) {
   return Math.max(0, ...value.split(/\r?\n/).map((line) => [...line].reduce((length, character) => length + (character.charCodeAt(0) > 255 ? 1.8 : 1), 0)));
+}
+
+function searchExcerpt(text: string, query: string, maxLength = 180) {
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const singleLine = text.replace(/\s+/g, " ").trim();
+  const excerptLength = Math.max(maxLength, normalizedQuery.length + 40);
+  if (!normalizedQuery || singleLine.length <= excerptLength) return singleLine;
+  const match = singleLine.toLocaleLowerCase().indexOf(normalizedQuery);
+  if (match < 0) return singleLine.slice(0, excerptLength);
+  const start = Math.max(0, match - Math.floor((excerptLength - normalizedQuery.length) / 2));
+  const end = Math.min(singleLine.length, start + excerptLength);
+  return `${start > 0 ? "…" : ""}${singleLine.slice(start, end)}${end < singleLine.length ? "…" : ""}`;
 }
 
 function readSidebarWidth() {

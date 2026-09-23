@@ -1,6 +1,6 @@
 [package]
 name = "struct-sheet"
-version = "0.7.1"
+version = "0.8.0"
 description = "Convert nested C structs into formatted Excel workbooks"
 authors = ["StructSheet"]
 edition = "2021"

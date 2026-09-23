@@ -1691,6 +1691,124 @@ tbody tr:hover td {
   background: #efede7;
 }
 
+.search-results-panel {
+  max-height: min(34vh, 300px);
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #f7f6f1;
+  border-bottom: 1px solid #c8c4b9;
+  box-shadow: 0 5px 13px rgba(55, 52, 42, 0.08);
+}
+
+.search-results-heading {
+  min-height: 34px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 12px;
+  color: #57544b;
+  background: #ece9e0;
+  border-bottom: 1px solid #d4d0c5;
+}
+
+.search-results-heading > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.search-results-heading strong {
+  font-size: 10px;
+}
+
+.search-results-heading > span {
+  color: #7e796f;
+  font-size: 9px;
+}
+
+.search-results-list {
+  min-height: 0;
+  overflow: auto;
+}
+
+.search-result-item {
+  width: 100%;
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: 34px 92px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 7px;
+  color: #403e37;
+  background: #fff;
+  border: 0;
+  border-bottom: 1px solid #ebe8df;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+.search-result-item:hover {
+  background: #fffde8;
+}
+
+.search-result-item.active {
+  background: #fff5a6;
+  box-shadow: inset 3px 0 0 #8d8100;
+}
+
+.search-result-index {
+  color: #999489;
+  font-size: 9px;
+  text-align: right;
+}
+
+.search-result-location {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.search-result-location strong {
+  color: #312f28;
+  font-size: 10px;
+}
+
+.search-result-location small {
+  overflow: hidden;
+  color: #858177;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-result-preview {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 10px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-result-preview mark {
+  padding: 0 1px;
+  color: inherit;
+  background: #ffea54;
+}
+
+.search-results-empty {
+  padding: 18px 12px;
+  color: #8c887e;
+  font-size: 10px;
+  text-align: center;
+}
+
 .reader-table-scroll table {
   min-width: 0;
   table-layout: fixed;
