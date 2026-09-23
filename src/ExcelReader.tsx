@@ -203,7 +203,7 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
     }
   }
 
-  function goToCell(rowNumber: number, column?: number) {
+  function goToCell(rowNumber: number, column?: number, behavior: ScrollBehavior = "smooth") {
     const index = dataRows.findIndex((row) => row.rowNumber === rowNumber);
     if (index < 0) return;
     setPage(Math.floor(index / PAGE_SIZE));
@@ -211,7 +211,7 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
     setActiveCell(column === undefined ? "" : `${rowNumber}:${column}`);
     window.setTimeout(() => {
       const selector = column === undefined ? `[data-reader-row="${rowNumber}"]` : `[data-reader-cell="${rowNumber}:${column}"]`;
-      document.querySelector(selector)?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+      document.querySelector(selector)?.scrollIntoView({ behavior, block: "center", inline: "center" });
     }, 30);
   }
 
@@ -352,7 +352,7 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
                       {hasChildren ? (
                         <button className="outline-toggle" title={collapsed ? "展开子章节" : "折叠子章节"} onClick={() => toggleSection(item.rowNumber)}><ChevronDown className={collapsed ? "collapsed" : ""} size={13} /></button>
                       ) : <span className="outline-toggle-spacer" />}
-                      <button className={`outline-link ${selectedRow === item.rowNumber ? "active" : ""}`} title={`${item.number} ${item.title}`} onClick={() => goToCell(item.rowNumber)}>
+                      <button className={`outline-link ${selectedRow === item.rowNumber ? "active" : ""}`} title={`${item.number} ${item.title}`} onClick={() => goToCell(item.rowNumber, undefined, "instant")}>
                         <span>{item.number}</span><strong>{item.title}</strong>
                       </button>
                     </div>
