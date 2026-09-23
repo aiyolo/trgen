@@ -9,6 +9,7 @@ mod table_xmacro;
 
 use parser::{ParseResult, StructCatalog};
 use std::path::PathBuf;
+use tauri::Manager;
 
 #[tauri::command]
 fn parse_source(source: String, root_name: Option<String>) -> Result<ParseResult, String> {
@@ -54,6 +55,23 @@ fn save_text_file(path: String, content: String) -> Result<String, String> {
 #[tauri::command]
 fn read_excel_document(path: String) -> Result<excel_reader::ExcelDocument, String> {
     excel_reader::read_document(&path)
+}
+
+#[tauri::command]
+fn show_excel_reader(app: tauri::AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window("excel-reader")
+        .ok_or_else(|| "Excel 阅读器窗口不可用。".to_string())?;
+    window.show().map_err(|error| error.to_string())?;
+    window.set_focus().map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn hide_excel_reader(window: tauri::WebviewWindow) -> Result<(), String> {
+    if window.label() != "excel-reader" {
+        return Err("只能关闭 Excel 阅读器窗口。".to_string());
+    }
+    window.hide().map_err(|error| error.to_string())
 }
 
 #[cfg(windows)]
@@ -123,19 +141,34 @@ pub fn run() {
         choose_table_path,
         choose_code_path,
         save_text_file,
-        read_excel_document
+        read_excel_document,
+        show_excel_reader,
+        hide_excel_reader
     ]);
 
     #[cfg(windows)]
     let builder = builder.on_page_load(move |webview, payload| {
         if payload.event() == tauri::webview::PageLoadEvent::Finished {
-            let window = webview.window();
-            let _ = window.center();
-            let _ = window.show();
-            if let Ok(mut splash) = splash_on_load.lock() {
-                if let Some(splash) = splash.take() {
-                    splash.close();
+            if webview.label() == "main" {
+                let window = webview.window();
+                let _ = window.center();
+                let _ = window.show();
+                if let Ok(mut splash) = splash_on_load.lock() {
+                    if let Some(splash) = splash.take() {
+                        splash.close();
+                    }
                 }
+            }
+        }
+    });
+
+    let builder = builder.on_window_event(|window, event| {
+        if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+            if window.label() == "excel-reader" {
+                api.prevent_close();
+                let _ = window.hide();
+            } else if window.label() == "main" {
+                window.app_handle().exit(0);
             }
         }
     });

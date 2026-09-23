@@ -1,6 +1,5 @@
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import ExcelReader from "./ExcelReader";
 import {
   Braces,
   BookOpenText,
@@ -98,7 +97,6 @@ function App() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState<Notice | null>(null);
   const [tableDialogOpen, setTableDialogOpen] = useState(false);
-  const [readerOpen, setReaderOpen] = useState(false);
   const [tablePath, setTablePath] = useState("");
   const [clipboardTable, setClipboardTable] = useState("");
   const [commonName, setCommonName] = useState("TABLE");
@@ -288,6 +286,14 @@ function App() {
     }
   }
 
+  async function openExcelReader() {
+    try {
+      await invoke("show_excel_reader");
+    } catch (reason) {
+      setNotice({ tone: "error", message: `无法打开 Excel 阅读器：${String(reason)}` });
+    }
+  }
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -303,7 +309,7 @@ function App() {
           <button
             className="button button-tool"
             title="打开 Excel 文档，使用章节目录、搜索和图片放大阅读"
-            onClick={() => setReaderOpen(true)}
+            onClick={() => void openExcelReader()}
           >
             <BookOpenText size={17} />
             Excel 阅读器
@@ -637,8 +643,6 @@ function App() {
           </section>
         </div>
       )}
-
-      {readerOpen && <ExcelReader onClose={() => setReaderOpen(false)} />}
 
       {notice && (
         <div className={`toast toast-${notice.tone}`} role="status">

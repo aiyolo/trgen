@@ -327,7 +327,7 @@ fn build_outline(rows: &[ExcelRow], header_index: usize) -> Vec<OutlineItem> {
             row_number: row.row_number,
             number: number.trim_end_matches('.').to_string(),
             title,
-            level: number.trim_end_matches('.').split('.').count().clamp(1, 12),
+            level: number.trim_end_matches('.').split('.').count().max(1),
         });
     }
     outline
@@ -414,13 +414,19 @@ mod tests {
         sheet.write_number(2, 0, 4).unwrap();
         sheet.write_string(2, 1, "1.1").unwrap();
         sheet.write_string(2, 2, "PURPOSE").unwrap();
+        sheet.write_number(3, 0, 5).unwrap();
+        sheet
+            .write_string(3, 1, "1.1.1.1.1.1.1.1.1.1.1.1.1")
+            .unwrap();
+        sheet.write_string(3, 2, "DEEP SECTION").unwrap();
         workbook.save(&path).unwrap();
 
         let document = read_document(&path.to_string_lossy()).unwrap();
         assert_eq!(document.sheets[0].headers[1], "标题编号");
-        assert_eq!(document.sheets[0].outline.len(), 2);
+        assert_eq!(document.sheets[0].outline.len(), 3);
         assert_eq!(document.sheets[0].outline[1].level, 2);
         assert_eq!(document.sheets[0].outline[1].title, "PURPOSE");
+        assert_eq!(document.sheets[0].outline[2].level, 13);
         fs::remove_file(path).unwrap();
     }
 

@@ -1490,6 +1490,285 @@ tbody tr:hover td {
   font-size: 8px;
 }
 
+.reader-window {
+  overflow: hidden;
+  background: #f4f2ec;
+}
+
+.reader-backdrop.is-standalone {
+  position: fixed;
+  padding: 0;
+  background: #f4f2ec;
+  backdrop-filter: none;
+}
+
+.reader-backdrop.is-standalone .excel-reader {
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  box-shadow: none;
+}
+
+.reader-workspace {
+  transition: grid-template-columns 120ms ease;
+}
+
+.sidebar-resizer {
+  position: relative;
+  z-index: 4;
+  min-width: 0;
+  cursor: col-resize;
+  background: #d2cec3;
+  border-left: 1px solid #f8f7f2;
+  border-right: 1px solid #bdb9ae;
+}
+
+.sidebar-resizer:hover,
+.is-resizing .sidebar-resizer {
+  background: var(--yellow);
+}
+
+.sidebar-hidden .sidebar-resizer {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.is-resizing,
+.is-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+.outline-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px !important;
+}
+
+.outline-actions button {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: #706d64;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.outline-actions button:hover {
+  color: #292820;
+  background: #dfdcd2;
+  border-color: #cbc7bb;
+}
+
+.outline-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 94px;
+  gap: 6px;
+  padding: 0 10px 9px;
+}
+
+.outline-controls .outline-search {
+  min-width: 0;
+  margin: 0;
+}
+
+.outline-controls select {
+  min-width: 0;
+  height: 32px;
+  padding: 0 6px;
+  color: #4b4941;
+  background: #fff;
+  border: 1px solid #c5c1b6;
+  outline: none;
+  font-size: 10px;
+}
+
+.outline-list {
+  padding: 2px 5px 12px;
+}
+
+.outline-node {
+  min-width: max-content;
+  display: flex;
+  align-items: center;
+  padding-right: 5px;
+}
+
+.outline-list .outline-toggle,
+.outline-toggle-spacer {
+  width: 22px;
+  min-width: 22px;
+  height: 28px;
+}
+
+.outline-list .outline-toggle {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: #77736a;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.outline-list .outline-toggle:hover {
+  color: #292820;
+  background: #dcd9cf;
+}
+
+.outline-toggle svg {
+  transition: transform 120ms ease;
+}
+
+.outline-toggle svg.collapsed {
+  transform: rotate(-90deg);
+}
+
+.outline-list .outline-link {
+  width: auto;
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 8px;
+  color: #403f38;
+  background: transparent;
+  border: 0;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+.outline-list .outline-link:hover {
+  background: #dfdcd2;
+}
+
+.outline-list .outline-link.active {
+  color: #25241e;
+  background: #fff7a5;
+  border-left-color: #746b00;
+}
+
+.outline-list .outline-link span {
+  flex: none;
+  color: #706d64;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.outline-list .outline-link strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reader-search button {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: #8b877c;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.reader-search button:hover {
+  color: #292820;
+  background: #efede7;
+}
+
+.reader-table-scroll table {
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.reader-table-scroll th,
+.reader-table-scroll td {
+  min-width: 0;
+  max-width: none;
+  overflow: hidden;
+}
+
+.reader-table-scroll th:not(.reader-row-number) {
+  position: sticky;
+  overflow: visible;
+}
+
+.reader-table-scroll th > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.column-resizer {
+  width: 9px;
+  position: absolute;
+  top: 0;
+  right: -5px;
+  bottom: 0;
+  z-index: 6;
+  cursor: col-resize;
+}
+
+.column-resizer::after {
+  width: 2px;
+  position: absolute;
+  top: 5px;
+  right: 3px;
+  bottom: 5px;
+  content: "";
+  background: transparent;
+}
+
+.column-resizer:hover::after,
+.is-resizing .column-resizer::after {
+  background: #948800;
+}
+
+.reader-table-scroll td.search-match {
+  background: #fffce1;
+  box-shadow: inset 0 0 0 1px #ddd061;
+}
+
+.reader-table-scroll td.active-search-match {
+  background: #fff28c !important;
+  box-shadow: inset 0 0 0 2px #8d8100;
+}
+
+.reader-table-scroll mark {
+  padding: 0 1px;
+  color: inherit;
+  background: #ffeb57;
+}
+
+.reader-table-scroll td .cell-image {
+  width: auto;
+  max-width: 100%;
+  max-height: 220px;
+  display: block;
+  margin: 4px auto;
+  padding: 0;
+  object-fit: contain;
+  background: transparent;
+  border: 0;
+  cursor: zoom-in;
+}
+
 .reader-statusbar {
   min-height: 34px;
   flex: none;
