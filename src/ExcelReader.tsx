@@ -47,6 +47,7 @@ type ExcelSheet = {
 };
 type ExcelDocument = { fileName: string; sourcePath: string; sheets: ExcelSheet[]; warnings: string[] };
 type SearchMatch = { rowNumber: number; column: number };
+type SidebarTab = "outline" | "search";
 type Props = { onClose: () => void; standalone?: boolean };
 
 const PAGE_SIZE = 400;
@@ -63,6 +64,7 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
   const [outlineQuery, setOutlineQuery] = useState("");
   const [outlineDepth, setOutlineDepth] = useState(0);
   const [collapsedSections, setCollapsedSections] = useState<Set<number>>(new Set());
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>("outline");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [searchCursor, setSearchCursor] = useState(-1);
@@ -180,6 +182,7 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
       if (event.ctrlKey && event.key.toLowerCase() === "f") {
         event.preventDefault();
         setSidebarOpen(true);
+        setSidebarTab("search");
         window.setTimeout(() => {
           searchInputRef.current?.focus();
           searchInputRef.current?.select();
@@ -197,6 +200,7 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
     setActiveCell("");
     setCollapsedSections(new Set());
     setColumnPickerOpen(false);
+    setSidebarTab("outline");
   }, [activeSheetIndex]);
 
   useEffect(() => {
@@ -246,6 +250,7 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
       setSearchTerm("");
       setOutlineQuery("");
       setOutlineDepth(0);
+      setSidebarTab("outline");
     } catch (reason) {
       setError(String(reason));
     } finally {
@@ -316,6 +321,11 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
     setSearchTerm("");
     setSearchCursor(-1);
     setActiveCell("");
+  }
+
+  function updateSearchQuery(value: string) {
+    setSearchQuery(value);
+    if (value.trim()) setSidebarTab("search");
   }
 
   function toggleColumn(column: number) {
@@ -447,13 +457,25 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
                 </div>
                 <label className="sidebar-search-input">
                   <Search size={14} />
-                  <input ref={searchInputRef} value={searchQuery} onKeyDown={handleSearchKeyDown} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Ctrl+F 搜索当前工作表" />
+                  <input ref={searchInputRef} value={searchQuery} onKeyDown={handleSearchKeyDown} onChange={(event) => updateSearchQuery(event.target.value)} placeholder="Ctrl+F 搜索当前工作表" />
                   {searchQuery && <button title="清除搜索" onClick={clearSearch}><X size={13} /></button>}
                 </label>
-                {searchTerm.trim() && (
+              </section>
+              <div className="sidebar-tabs" role="tablist" aria-label="侧边栏视图">
+                <button className={`sidebar-tab ${sidebarTab === "outline" ? "active" : ""}`} role="tab" aria-selected={sidebarTab === "outline"} onClick={() => setSidebarTab("outline")}>
+                  <BookOpenText size={14} /><strong>章节目录</strong><span>{sheet?.outline.length ?? 0}</span>
+                </button>
+                <button className={`sidebar-tab ${sidebarTab === "search" ? "active" : ""}`} role="tab" aria-selected={sidebarTab === "search"} onClick={() => setSidebarTab("search")}>
+                  <Search size={14} /><strong>搜索结果</strong><span>{searchResults.length}</span>
+                </button>
+              </div>
+              {sidebarTab === "search" ? (
+                <section className="sidebar-tab-content search-tab-panel" role="tabpanel" aria-label="搜索结果">
                   <div className="sidebar-search-results">
-                    <div className="search-results-heading"><strong>全部命中条目</strong><span>{searchResults.length ? `${searchCursor >= 0 ? searchCursor + 1 : 0} / ${searchResults.length}` : "0 条"}</span></div>
-                    {searchResults.length ? (
+                    <div className="search-results-heading"><strong>全部命中条目</strong><span>{searchTerm.trim() && searchResults.length ? `${searchCursor >= 0 ? searchCursor + 1 : 0} / ${searchResults.length}` : "0 条"}</span></div>
+                    {!searchTerm.trim() ? (
+                      <div className="search-results-empty">输入关键词后，所有命中条目会显示在这里。</div>
+                    ) : searchResults.length ? (
                       <div ref={searchResultsListRef} className="search-results-list" aria-label="搜索结果列表">
                         {searchResults.map((match, index) => {
                           const cellText = rowsByNumber.get(match.rowNumber)?.cells[match.column] ?? "";
@@ -476,39 +498,42 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
                       </div>
                     ) : <div className="search-results-empty">当前工作表没有匹配内容。</div>}
                   </div>
-                )}
-              </section>
-              <div className="outline-heading">
-                <div><BookOpenText size={14} /><strong>章节目录</strong><span>{sheet?.outline.length ?? 0}</span></div>
-                <div className="outline-actions">
-                  <button title="全部折叠" onClick={() => setCollapsedSections(new Set(outlineHasChildren))}><ChevronsDownUp size={14} /></button>
-                  <button title="全部展开" onClick={() => setCollapsedSections(new Set())}><ChevronsUpDown size={14} /></button>
-                </div>
-              </div>
-              <div className="outline-controls">
-                <label className="outline-search"><Search size={13} /><input value={outlineQuery} onChange={(event) => setOutlineQuery(event.target.value)} placeholder="筛选目录" /></label>
-                <select value={outlineDepth} onChange={(event) => setOutlineDepth(Number(event.target.value))} title="显示目录层级">
-                  {[3, 5, 10, 20].filter((depth) => depth < maxOutlineDepth).map((depth) => <option key={depth} value={depth}>前 {depth} 级</option>)}
-                  <option value={0}>全部 {maxOutlineDepth} 级</option>
-                </select>
-              </div>
-              <nav className="outline-list" aria-label="章节目录">
-                {filteredOutline.length ? filteredOutline.map((item) => {
-                  const hasChildren = outlineHasChildren.has(item.rowNumber);
-                  const collapsed = collapsedSections.has(item.rowNumber);
-                  const matchCount = matchingSectionCounts.get(item.rowNumber) ?? 0;
-                  return (
-                    <div className="outline-node" key={`${item.rowNumber}-${item.number}`} style={{ paddingLeft: `${8 + Math.max(0, item.level - 1) * 14}px` }}>
-                      {hasChildren ? (
-                        <button className="outline-toggle" title={collapsed ? "展开子章节" : "折叠子章节"} onClick={() => toggleSection(item.rowNumber)}><ChevronDown className={collapsed ? "collapsed" : ""} size={13} /></button>
-                      ) : <span className="outline-toggle-spacer" />}
-                      <button className={`outline-link ${selectedRow === item.rowNumber ? "active" : ""} ${matchCount ? "has-search-match" : ""}`} title={`${item.number} ${item.title}${matchCount ? ` · ${matchCount} 个命中` : ""}`} onClick={() => goToCell(item.rowNumber, undefined, "instant")}>
-                        <span>{item.number}</span><strong>{item.title}</strong>{matchCount > 0 && <em className="outline-match-count">{matchCount}</em>}
-                      </button>
+                </section>
+              ) : (
+                <section className="sidebar-tab-content outline-tab-panel" role="tabpanel" aria-label="章节目录">
+                  <div className="outline-heading">
+                    <div><BookOpenText size={14} /><strong>章节目录</strong><span>{sheet?.outline.length ?? 0}</span></div>
+                    <div className="outline-actions">
+                      <button title="全部折叠" onClick={() => setCollapsedSections(new Set(outlineHasChildren))}><ChevronsDownUp size={14} /></button>
+                      <button title="全部展开" onClick={() => setCollapsedSections(new Set())}><ChevronsUpDown size={14} /></button>
                     </div>
-                  );
-                }) : <div className="outline-empty">没有匹配的章节。可以使用全文搜索查找正文。</div>}
-              </nav>
+                  </div>
+                  <div className="outline-controls">
+                    <label className="outline-search"><Search size={13} /><input value={outlineQuery} onChange={(event) => setOutlineQuery(event.target.value)} placeholder="筛选目录" /></label>
+                    <select value={outlineDepth} onChange={(event) => setOutlineDepth(Number(event.target.value))} title="显示目录层级">
+                      {[3, 5, 10, 20].filter((depth) => depth < maxOutlineDepth).map((depth) => <option key={depth} value={depth}>前 {depth} 级</option>)}
+                      <option value={0}>全部 {maxOutlineDepth} 级</option>
+                    </select>
+                  </div>
+                  <nav className="outline-list" aria-label="章节目录">
+                    {filteredOutline.length ? filteredOutline.map((item) => {
+                      const hasChildren = outlineHasChildren.has(item.rowNumber);
+                      const collapsed = collapsedSections.has(item.rowNumber);
+                      const matchCount = matchingSectionCounts.get(item.rowNumber) ?? 0;
+                      return (
+                        <div className="outline-node" key={`${item.rowNumber}-${item.number}`} style={{ paddingLeft: `${8 + Math.max(0, item.level - 1) * 14}px` }}>
+                          {hasChildren ? (
+                            <button className="outline-toggle" title={collapsed ? "展开子章节" : "折叠子章节"} onClick={() => toggleSection(item.rowNumber)}><ChevronDown className={collapsed ? "collapsed" : ""} size={13} /></button>
+                          ) : <span className="outline-toggle-spacer" />}
+                          <button className={`outline-link ${selectedRow === item.rowNumber ? "active" : ""} ${matchCount ? "has-search-match" : ""}`} title={`${item.number} ${item.title}${matchCount ? ` · ${matchCount} 个命中` : ""}`} onClick={() => goToCell(item.rowNumber, undefined, "instant")}>
+                            <span>{item.number}</span><strong>{item.title}</strong>{matchCount > 0 && <em className="outline-match-count">{matchCount}</em>}
+                          </button>
+                        </div>
+                      );
+                    }) : <div className="outline-empty">没有匹配的章节。可以使用全文搜索查找正文。</div>}
+                  </nav>
+                </section>
+              )}
             </aside>
 
             <div className="sidebar-resizer" role="separator" aria-label="调整目录宽度" aria-orientation="vertical" onPointerDown={beginSidebarResize} />
