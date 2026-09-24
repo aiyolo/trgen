@@ -16,13 +16,16 @@ import {
   ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
+  Columns3,
   FileSpreadsheet,
   FolderOpen,
+  Highlighter,
   LoaderCircle,
   PanelLeftClose,
   PanelLeftOpen,
   Rows3,
   Search,
+  Type,
   WrapText,
   X,
   ZoomIn,
@@ -64,12 +67,15 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
   const [searchTerm, setSearchTerm] = useState("");
   const [searchCursor, setSearchCursor] = useState(-1);
   const [page, setPage] = useState(0);
-  const [zoom, setZoom] = useState(100);
+  const [zoom, setZoom] = useState(readReaderZoom);
   const [wrap, setWrap] = useState(true);
   const [compact, setCompact] = useState(false);
+  const [syntaxHighlight, setSyntaxHighlight] = useState(readSyntaxHighlight);
+  const [columnPickerOpen, setColumnPickerOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState<number | null>(null);
   const [activeCell, setActiveCell] = useState("");
   const [columnWidthsBySheet, setColumnWidthsBySheet] = useState<Record<string, number[]>>({});
+  const [visibleColumnsBySheet, setVisibleColumnsBySheet] = useState<Record<string, boolean[]>>({});
   const [activeImage, setActiveImage] = useState<CellImage | null>(null);
   const [imageZoom, setImageZoom] = useState(100);
   const readerBodyRef = useRef<HTMLDivElement>(null);
@@ -81,7 +87,9 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
   const dataRows = useMemo(() => sheet?.rows.filter((_, index) => index !== sheet.headerRow) ?? [], [sheet]);
   const suggestedWidths = useMemo(() => (sheet ? suggestColumnWidths(sheet) : []), [sheet]);
   const columnWidths = sheet ? columnWidthsBySheet[sheet.name] ?? suggestedWidths : [];
-  const tableWidth = 48 + columnWidths.reduce((total, width) => total + width, 0);
+  const visibleColumns = sheet ? visibleColumnsBySheet[sheet.name] ?? sheet.headers.map(() => true) : [];
+  const visibleColumnIndexes = useMemo(() => sheet?.headers.map((_, column) => column).filter((column) => visibleColumns[column] !== false) ?? [], [sheet, visibleColumns]);
+  const tableWidth = 48 + visibleColumnIndexes.reduce((total, column) => total + (columnWidths[column] ?? 120), 0);
   const totalPages = Math.max(1, Math.ceil(dataRows.length / PAGE_SIZE));
   const visibleRows = useMemo(() => dataRows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE), [dataRows, page]);
   const sectionRows = useMemo(() => new Map(sheet?.outline.map((item) => [item.rowNumber, item.level]) ?? []), [sheet]);
@@ -133,6 +141,25 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
   }, [dataRows, searchTerm]);
   const rowsByNumber = useMemo(() => new Map(dataRows.map((row) => [row.rowNumber, row])), [dataRows]);
   const searchResultCells = useMemo(() => new Set(searchResults.map((match) => `${match.rowNumber}:${match.column}`)), [searchResults]);
+  const matchingSectionCounts = useMemo(() => {
+    const counts = new Map<number, number>();
+    const outline = sheet?.outline ?? [];
+    let sectionIndex = -1;
+    for (const match of searchResults) {
+      while (sectionIndex + 1 < outline.length && outline[sectionIndex + 1].rowNumber <= match.rowNumber) sectionIndex += 1;
+      if (sectionIndex >= 0) {
+        let parentLevel = Number.POSITIVE_INFINITY;
+        for (let index = sectionIndex; index >= 0; index -= 1) {
+          const section = outline[index];
+          if (section.level >= parentLevel) continue;
+          counts.set(section.rowNumber, (counts.get(section.rowNumber) ?? 0) + 1);
+          parentLevel = section.level;
+          if (parentLevel === 1) break;
+        }
+      }
+    }
+    return counts;
+  }, [sheet, searchResults]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setSearchTerm(searchQuery), 160);
@@ -143,6 +170,7 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         if (activeImage) setActiveImage(null);
+        else if (columnPickerOpen) setColumnPickerOpen(false);
         else onClose();
       }
       if (event.ctrlKey && event.key.toLowerCase() === "o") {
@@ -151,8 +179,11 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
       }
       if (event.ctrlKey && event.key.toLowerCase() === "f") {
         event.preventDefault();
-        searchInputRef.current?.focus();
-        searchInputRef.current?.select();
+        setSidebarOpen(true);
+        window.setTimeout(() => {
+          searchInputRef.current?.focus();
+          searchInputRef.current?.select();
+        });
       }
     }
     window.addEventListener("keydown", onKeyDown);
@@ -165,6 +196,7 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
     setSelectedRow(null);
     setActiveCell("");
     setCollapsedSections(new Set());
+    setColumnPickerOpen(false);
   }, [activeSheetIndex]);
 
   useEffect(() => {
@@ -190,6 +222,14 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
     window.localStorage.setItem("structsheet.reader.sidebarWidth", String(sidebarWidth));
   }, [sidebarWidth]);
 
+  useEffect(() => {
+    window.localStorage.setItem("structsheet.reader.zoom", String(zoom));
+  }, [zoom]);
+
+  useEffect(() => {
+    window.localStorage.setItem("structsheet.reader.syntaxHighlight", String(syntaxHighlight));
+  }, [syntaxHighlight]);
+
   async function openWorkbook() {
     setBusy(true);
     setError("");
@@ -199,6 +239,7 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
       const loaded = await invoke<ExcelDocument>("read_excel_document", { path });
       setDocumentData(loaded);
       setColumnWidthsBySheet({});
+      setVisibleColumnsBySheet({});
       setActiveSheetIndex(0);
       setPage(0);
       setSearchQuery("");
@@ -218,6 +259,13 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
     setPage(Math.floor(index / PAGE_SIZE));
     setSelectedRow(rowNumber);
     setActiveCell(column === undefined ? "" : `${rowNumber}:${column}`);
+    if (column !== undefined && sheet && visibleColumns[column] === false) {
+      setVisibleColumnsBySheet((current) => {
+        const columns = [...(current[sheet.name] ?? sheet.headers.map(() => true))];
+        columns[column] = true;
+        return { ...current, [sheet.name]: columns };
+      });
+    }
     window.setTimeout(() => {
       const selector = column === undefined ? `[data-reader-row="${rowNumber}"]` : `[data-reader-cell="${rowNumber}:${column}"]`;
       document.querySelector(selector)?.scrollIntoView({ behavior, block: "center", inline: "center" });
@@ -233,14 +281,14 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
         : (searchCursor - 1 + searchResults.length) % searchResults.length;
     setSearchCursor(next);
     const match = searchResults[next];
-    goToCell(match.rowNumber, match.column);
+    goToCell(match.rowNumber, match.column, "instant");
   }
 
   function selectSearchResult(index: number) {
     const match = searchResults[index];
     if (!match) return;
     setSearchCursor(index);
-    goToCell(match.rowNumber, match.column);
+    goToCell(match.rowNumber, match.column, "instant");
   }
 
   function clearSearch() {
@@ -248,6 +296,22 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
     setSearchTerm("");
     setSearchCursor(-1);
     setActiveCell("");
+  }
+
+  function toggleColumn(column: number) {
+    if (!sheet) return;
+    setVisibleColumnsBySheet((current) => {
+      const columns = [...(current[sheet.name] ?? sheet.headers.map(() => true))];
+      const visibleCount = columns.filter((visible) => visible !== false).length;
+      if (columns[column] !== false && visibleCount === 1) return current;
+      columns[column] = columns[column] === false;
+      return { ...current, [sheet.name]: columns };
+    });
+  }
+
+  function showAllColumns() {
+    if (!sheet) return;
+    setVisibleColumnsBySheet((current) => ({ ...current, [sheet.name]: sheet.headers.map(() => true) }));
   }
 
   function handleSearchKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
@@ -314,7 +378,8 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
 
   const workspaceStyle = {
     gridTemplateColumns: sidebarOpen ? `${sidebarWidth}px 6px minmax(0, 1fr)` : "0 0 minmax(0, 1fr)",
-  } satisfies CSSProperties;
+    "--reader-font-scale": String(zoom / 100),
+  } as CSSProperties;
 
   return (
     <div className={`reader-backdrop ${standalone ? "is-standalone" : ""}`}>
@@ -352,6 +417,47 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
                   {documentData.sheets.map((item, index) => <option key={`${item.name}-${index}`} value={index}>{item.name}</option>)}
                 </select>
               </div>
+              <section className="sidebar-document-search" aria-label="文内搜索">
+                <div className="sidebar-search-heading">
+                  <div><Search size={14} /><strong>文内搜索</strong></div>
+                  <div className="sidebar-search-navigation">
+                    <button disabled={!searchResults.length} title="上一个匹配（Shift+Enter）" onClick={() => stepSearch(-1)}><ChevronLeft size={14} /></button>
+                    <button disabled={!searchResults.length} title="下一个匹配（Enter）" onClick={() => stepSearch(1)}><ChevronRight size={14} /></button>
+                  </div>
+                </div>
+                <label className="sidebar-search-input">
+                  <Search size={14} />
+                  <input ref={searchInputRef} value={searchQuery} onKeyDown={handleSearchKeyDown} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Ctrl+F 搜索当前工作表" />
+                  {searchQuery && <button title="清除搜索" onClick={clearSearch}><X size={13} /></button>}
+                </label>
+                {searchTerm.trim() && (
+                  <div className="sidebar-search-results">
+                    <div className="search-results-heading"><strong>全部命中条目</strong><span>{searchResults.length ? `${searchCursor >= 0 ? searchCursor + 1 : 0} / ${searchResults.length}` : "0 条"}</span></div>
+                    {searchResults.length ? (
+                      <div ref={searchResultsListRef} className="search-results-list" aria-label="搜索结果列表">
+                        {searchResults.map((match, index) => {
+                          const cellText = rowsByNumber.get(match.rowNumber)?.cells[match.column] ?? "";
+                          const address = `${columnLetters(match.column)}${match.rowNumber}`;
+                          const header = sheet?.headers[match.column] || `第 ${match.column + 1} 列`;
+                          return (
+                            <button
+                              className={`search-result-item ${searchCursor === index ? "active" : ""}`}
+                              data-search-result={index}
+                              key={`${match.rowNumber}:${match.column}`}
+                              title={`${address} · ${header}\n${cellText}`}
+                              onClick={() => selectSearchResult(index)}
+                            >
+                              <span className="search-result-index">{index + 1}</span>
+                              <span className="search-result-location"><strong>{address}</strong><small>{header}</small></span>
+                              <span className="search-result-preview"><HighlightedText text={searchExcerpt(cellText, searchTerm)} query={searchTerm} /></span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : <div className="search-results-empty">当前工作表没有匹配内容。</div>}
+                  </div>
+                )}
+              </section>
               <div className="outline-heading">
                 <div><BookOpenText size={14} /><strong>章节目录</strong><span>{sheet?.outline.length ?? 0}</span></div>
                 <div className="outline-actions">
@@ -370,13 +476,14 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
                 {filteredOutline.length ? filteredOutline.map((item) => {
                   const hasChildren = outlineHasChildren.has(item.rowNumber);
                   const collapsed = collapsedSections.has(item.rowNumber);
+                  const matchCount = matchingSectionCounts.get(item.rowNumber) ?? 0;
                   return (
                     <div className="outline-node" key={`${item.rowNumber}-${item.number}`} style={{ paddingLeft: `${8 + Math.max(0, item.level - 1) * 14}px` }}>
                       {hasChildren ? (
                         <button className="outline-toggle" title={collapsed ? "展开子章节" : "折叠子章节"} onClick={() => toggleSection(item.rowNumber)}><ChevronDown className={collapsed ? "collapsed" : ""} size={13} /></button>
                       ) : <span className="outline-toggle-spacer" />}
-                      <button className={`outline-link ${selectedRow === item.rowNumber ? "active" : ""}`} title={`${item.number} ${item.title}`} onClick={() => goToCell(item.rowNumber, undefined, "instant")}>
-                        <span>{item.number}</span><strong>{item.title}</strong>
+                      <button className={`outline-link ${selectedRow === item.rowNumber ? "active" : ""} ${matchCount ? "has-search-match" : ""}`} title={`${item.number} ${item.title}${matchCount ? ` · ${matchCount} 个命中` : ""}`} onClick={() => goToCell(item.rowNumber, undefined, "instant")}>
+                        <span>{item.number}</span><strong>{item.title}</strong>{matchCount > 0 && <em className="outline-match-count">{matchCount}</em>}
                       </button>
                     </div>
                   );
@@ -389,74 +496,56 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
             <div className="reader-main">
               <div className="reader-toolbar">
                 <button className="reader-tool-icon" title={sidebarOpen ? "隐藏目录" : "显示目录"} onClick={() => setSidebarOpen(!sidebarOpen)}>{sidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}</button>
-                <label className="reader-search">
-                  <Search size={14} />
-                  <input ref={searchInputRef} value={searchQuery} onKeyDown={handleSearchKeyDown} onChange={(event) => setSearchQuery(event.target.value)} placeholder="搜索当前工作表，Enter 下一处" />
-                  {searchQuery && <button title="清除搜索" onClick={clearSearch}><X size={13} /></button>}
-                  <span>{searchTerm.trim() ? (searchResults.length ? `${searchCursor >= 0 ? searchCursor + 1 : 0} / ${searchResults.length}` : "无结果") : ""}</span>
-                </label>
-                <button className="reader-tool-icon" disabled={!searchResults.length} title="上一个匹配（Shift+Enter）" onClick={() => stepSearch(-1)}><ChevronLeft size={15} /></button>
-                <button className="reader-tool-icon" disabled={!searchResults.length} title="下一个匹配（Enter）" onClick={() => stepSearch(1)}><ChevronRight size={15} /></button>
+                <div className="column-picker">
+                  <button className={`reader-tool-button ${columnPickerOpen ? "active" : ""}`} title="选择正文中显示的列" onClick={() => setColumnPickerOpen(!columnPickerOpen)}><Columns3 size={15} />显示列 <span>{visibleColumnIndexes.length}/{sheet?.headers.length ?? 0}</span></button>
+                  {columnPickerOpen && (
+                    <div className="column-picker-menu">
+                      <div className="column-picker-heading"><strong>显示指定的列</strong><button onClick={showAllColumns}>全部显示</button></div>
+                      <div className="column-picker-list">
+                        {sheet?.headers.map((header, column) => (
+                          <label key={`${header}-${column}`} title={header}>
+                            <input type="checkbox" checked={visibleColumns[column] !== false} disabled={visibleColumns[column] !== false && visibleColumnIndexes.length === 1} onChange={() => toggleColumn(column)} />
+                            <span>{columnLetters(column)}</span><strong>{header || `第 ${column + 1} 列`}</strong>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
                 <div className="toolbar-separator" />
-                <button className="reader-tool-icon" title="缩小" onClick={() => setZoom(Math.max(70, zoom - 10))}><ZoomOut size={15} /></button>
-                <button className="zoom-value" title="恢复 100%" onClick={() => setZoom(100)}>{zoom}%</button>
-                <button className="reader-tool-icon" title="放大" onClick={() => setZoom(Math.min(170, zoom + 10))}><ZoomIn size={15} /></button>
+                <span className="font-size-label"><Type size={14} />阅读字号</span>
+                <button className="reader-tool-icon" title="缩小字体" onClick={() => setZoom(Math.max(90, zoom - 10))}><ZoomOut size={15} /></button>
+                <button className="zoom-value" title="恢复默认 120%" onClick={() => setZoom(120)}>{zoom}%</button>
+                <button className="reader-tool-icon" title="增大字体" onClick={() => setZoom(Math.min(180, zoom + 10))}><ZoomIn size={15} /></button>
+                <button className={`reader-tool-button ${syntaxHighlight ? "active" : ""}`} title="突出显示标签、引用、关键词、类型和数字" onClick={() => setSyntaxHighlight(!syntaxHighlight)}><Highlighter size={15} />语法高亮</button>
                 <button className={`reader-tool-icon ${wrap ? "active" : ""}`} title="自动换行" onClick={() => setWrap(!wrap)}><WrapText size={16} /></button>
                 <button className={`reader-tool-icon ${compact ? "active" : ""}`} title="紧凑行高" onClick={() => setCompact(!compact)}><Rows3 size={16} /></button>
               </div>
-
-              {searchTerm.trim() && (
-                <section className="search-results-panel" aria-label="全部搜索结果">
-                  <div className="search-results-heading">
-                    <div><Search size={13} /><strong>全部命中条目</strong></div>
-                    <span>{searchResults.length} 条</span>
-                  </div>
-                  {searchResults.length ? (
-                    <div ref={searchResultsListRef} className="search-results-list" aria-label="搜索结果列表">
-                      {searchResults.map((match, index) => {
-                        const cellText = rowsByNumber.get(match.rowNumber)?.cells[match.column] ?? "";
-                        const address = `${columnName(match.column)}${match.rowNumber}`;
-                        const header = sheet?.headers[match.column] || `第 ${match.column + 1} 列`;
-                        return (
-                          <button
-                            className={`search-result-item ${searchCursor === index ? "active" : ""}`}
-                            data-search-result={index}
-                            key={`${match.rowNumber}:${match.column}`}
-                            title={`${address} · ${header}\n${cellText}`}
-                            onClick={() => selectSearchResult(index)}
-                          >
-                            <span className="search-result-index">{index + 1}</span>
-                            <span className="search-result-location"><strong>{address}</strong><small>{header}</small></span>
-                            <span className="search-result-preview"><HighlightedText text={searchExcerpt(cellText, searchTerm)} query={searchTerm} /></span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : <div className="search-results-empty">当前工作表没有匹配内容。</div>}
-                </section>
-              )}
 
               {documentData.warnings.length > 0 && <div className="reader-warning" title={documentData.warnings.join("\n")}>{documentData.warnings[0]}</div>}
               {error && <div className="reader-error reader-inline-error">{error}</div>}
 
               <div ref={readerBodyRef} className={`reader-table-scroll ${wrap ? "is-wrapped" : ""} ${compact ? "is-compact" : ""}`}>
                 <table style={{ fontSize: `${zoom}%`, width: `${tableWidth}px` }}>
-                  <colgroup><col style={{ width: "48px" }} />{columnWidths.map((width, column) => <col key={column} style={{ width: `${width}px` }} />)}</colgroup>
-                  <thead><tr><th className="reader-row-number">#</th>{sheet?.headers.map((header, column) => (
+                  <colgroup><col style={{ width: "48px" }} />{visibleColumnIndexes.map((column) => <col key={column} style={{ width: `${columnWidths[column] ?? 120}px` }} />)}</colgroup>
+                  <thead><tr><th className="reader-row-number">#</th>{visibleColumnIndexes.map((column) => {
+                    const header = sheet?.headers[column] ?? "";
+                    return (
                     <th key={`${header}-${column}`}><span>{header}</span><div className="column-resizer" title="拖动调整列宽，双击自动适应" onPointerDown={(event) => beginColumnResize(column, event)} onDoubleClick={() => updateColumnWidth(column, suggestedWidths[column] ?? 120)} /></th>
-                  ))}</tr></thead>
+                    );
+                  })}</tr></thead>
                   <tbody>
                     {visibleRows.map((row) => {
                       const sectionLevel = sectionRows.get(row.rowNumber);
                       return (
                         <tr key={row.rowNumber} data-reader-row={row.rowNumber} className={`${sectionLevel ? "section-row" : ""} ${selectedRow === row.rowNumber ? "selected-row" : ""}`} style={sectionLevel ? { "--section-level": sectionLevel } as CSSProperties : undefined} onClick={() => setSelectedRow(row.rowNumber)}>
                           <td className="reader-row-number">{row.rowNumber}</td>
-                          {sheet?.headers.map((_, column) => {
+                          {visibleColumnIndexes.map((column) => {
                             const cellKey = `${row.rowNumber}:${column}`;
                             const cellImages = imagesByCell.get(cellKey) ?? [];
                             return (
                               <td key={column} data-reader-cell={cellKey} className={`${searchResultCells.has(cellKey) ? "search-match" : ""} ${activeCell === cellKey ? "active-search-match" : ""}`} title={row.cells[column] || undefined}>
-                                {row.cells[column] && <span className="cell-text"><HighlightedText text={row.cells[column]} query={searchTerm} /></span>}
+                                {row.cells[column] && <span className="cell-text"><ReadableText text={row.cells[column]} query={searchTerm} syntax={syntaxHighlight} /></span>}
                                 {cellImages.map((image, imageIndex) => <img key={`${image.name}-${imageIndex}`} className="cell-image" src={image.dataUrl} alt={image.name} title="双击放大" onDoubleClick={(event) => { event.stopPropagation(); setActiveImage(image); setImageZoom(100); }} />)}
                               </td>
                             );
@@ -515,6 +604,54 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
   return <>{parts}</>;
 }
 
+function ReadableText({ text, query, syntax }: { text: string; query: string; syntax: boolean }) {
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  if (!normalizedQuery) return syntax ? <SyntaxText text={text} /> : text;
+  const normalizedText = text.toLocaleLowerCase();
+  const parts: ReactNode[] = [];
+  let position = 0;
+  let match = normalizedText.indexOf(normalizedQuery);
+  while (match >= 0) {
+    if (match > position) {
+      const segment = text.slice(position, match);
+      parts.push(syntax ? <SyntaxText key={`syntax-${position}`} text={segment} /> : segment);
+    }
+    parts.push(<mark key={`search-${match}`}>{text.slice(match, match + normalizedQuery.length)}</mark>);
+    position = match + normalizedQuery.length;
+    match = normalizedText.indexOf(normalizedQuery, position);
+  }
+  if (position < text.length) {
+    const segment = text.slice(position);
+    parts.push(syntax ? <SyntaxText key={`syntax-${position}`} text={segment} /> : segment);
+  }
+  return <>{parts}</>;
+}
+
+const SYNTAX_TOKEN_PATTERN = /(\[[A-Z][A-Z0-9_-]*\]|<[^>\r\n]+>|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\b(?:shall|must|should|if|then|else|when|while|and|or|not|true|false|null|return)\b|\b(?:unsigned\s+char|signed\s+char|unsigned\s+short|unsigned\s+int|unsigned\s+long|char|short|int|long|float|double|bool|void|uint\d+_t|int\d+_t)\b|\b(?:0x[\da-f]+|\d+(?:\.\d+)*)\b)/gi;
+
+function SyntaxText({ text }: { text: string }) {
+  const parts: ReactNode[] = [];
+  let position = 0;
+  for (const match of text.matchAll(SYNTAX_TOKEN_PATTERN)) {
+    const index = match.index ?? 0;
+    if (index > position) parts.push(text.slice(position, index));
+    const token = match[0];
+    parts.push(<span className={`syntax-token ${syntaxTokenClass(token)}`} key={`${index}-${token}`}>{token}</span>);
+    position = index + token.length;
+  }
+  if (position < text.length) parts.push(text.slice(position));
+  return <>{parts}</>;
+}
+
+function syntaxTokenClass(token: string) {
+  if (token.startsWith("[")) return "syntax-tag";
+  if (token.startsWith("<")) return "syntax-reference";
+  if (token.startsWith('"') || token.startsWith("'")) return "syntax-string";
+  if (/^(?:0x[\da-f]+|\d)/i.test(token)) return "syntax-number";
+  if (/^(?:unsigned|signed|char|short|int|long|float|double|bool|void|uint\d+_t|int\d+_t)/i.test(token)) return "syntax-type";
+  return "syntax-keyword";
+}
+
 function suggestColumnWidths(sheet: ExcelSheet) {
   const imageColumns = new Set(sheet.images.map((image) => image.column));
   return sheet.headers.map((header, column) => {
@@ -551,12 +688,25 @@ function readSidebarWidth() {
   return Number.isFinite(stored) && stored >= SIDEBAR_MIN && stored <= SIDEBAR_MAX ? stored : 310;
 }
 
-function columnName(index: number) {
+function readReaderZoom() {
+  const stored = Number(window.localStorage.getItem("structsheet.reader.zoom"));
+  return Number.isFinite(stored) && stored >= 90 && stored <= 180 ? stored : 120;
+}
+
+function readSyntaxHighlight() {
+  return window.localStorage.getItem("structsheet.reader.syntaxHighlight") === "true";
+}
+
+function columnLetters(index: number) {
   let value = index;
   let output = "";
   do {
     output = String.fromCharCode(65 + (value % 26)) + output;
     value = Math.floor(value / 26) - 1;
   } while (value >= 0);
-  return `${output} 列`;
+  return output;
+}
+
+function columnName(index: number) {
+  return `${columnLetters(index)} 列`;
 }
