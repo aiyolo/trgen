@@ -277,7 +277,17 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
         const top = scrollArea.scrollTop + targetRect.top - scrollAreaRect.top - (scrollArea.clientHeight - targetRect.height) / 2;
         scrollArea.scrollTo({ top: Math.max(0, top), left: scrollArea.scrollLeft, behavior });
       } else {
-        target.scrollIntoView({ behavior, block: "center", inline: "nearest" });
+        const scrollAreaRect = scrollArea.getBoundingClientRect();
+        const targetRect = target.getBoundingClientRect();
+        const headerHeight = scrollArea.querySelector<HTMLElement>("thead")?.getBoundingClientRect().height ?? 0;
+        const rowNumberWidth = scrollArea.querySelector<HTMLElement>(".reader-row-number")?.getBoundingClientRect().width ?? 48;
+        const top = scrollArea.scrollTop + targetRect.top - scrollAreaRect.top - headerHeight - 4;
+        const visibleLeft = scrollAreaRect.left + rowNumberWidth + 8;
+        const visibleRight = scrollAreaRect.right - 8;
+        let left = scrollArea.scrollLeft;
+        if (targetRect.left < visibleLeft) left += targetRect.left - visibleLeft;
+        else if (targetRect.right > visibleRight) left += targetRect.right - visibleRight;
+        scrollArea.scrollTo({ top: Math.max(0, top), left: Math.max(0, left), behavior });
       }
     }, 30);
   }
