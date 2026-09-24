@@ -268,7 +268,17 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
     }
     window.setTimeout(() => {
       const selector = column === undefined ? `[data-reader-row="${rowNumber}"]` : `[data-reader-cell="${rowNumber}:${column}"]`;
-      document.querySelector(selector)?.scrollIntoView({ behavior, block: "center", inline: "center" });
+      const scrollArea = readerBodyRef.current;
+      const target = scrollArea?.querySelector<HTMLElement>(selector);
+      if (!scrollArea || !target) return;
+      if (column === undefined) {
+        const scrollAreaRect = scrollArea.getBoundingClientRect();
+        const targetRect = target.getBoundingClientRect();
+        const top = scrollArea.scrollTop + targetRect.top - scrollAreaRect.top - (scrollArea.clientHeight - targetRect.height) / 2;
+        scrollArea.scrollTo({ top: Math.max(0, top), left: scrollArea.scrollLeft, behavior });
+      } else {
+        target.scrollIntoView({ behavior, block: "center", inline: "nearest" });
+      }
     }, 30);
   }
 
