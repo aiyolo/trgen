@@ -2,6 +2,8 @@
 
 一个使用 Rust + Tauri 2 构建的桌面工具：输入 C 语言结构体定义，递归展开嵌套字段并导出带格式的 Excel 字段表。
 
+导出 `TR2_DD_IN` / `TR2_DD_OUT` 字段表时，默认文件名会自动规范为 `TR2_SW_DD_IN.xlsx` / `TR2_SW_DD_OUT.xlsx`；其他导出文件也不再附加中文“字段表”后缀。
+
 ## 功能
 
 - 解析 `typedef struct { ... } Name;`、`typedef struct Tag { ... } Name;` 和 `struct Name { ... };`

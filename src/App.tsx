@@ -73,6 +73,12 @@ typedef struct {
     char name[16];          // 设备名称
 } DevicePacket;`;
 
+function fieldTableExportStem(rootName: string) {
+  const normalized = rootName.trim();
+  const tr2Direction = normalized.match(/^TR2_(?:SW_)?DD_(IN|OUT)$/i)?.[1];
+  return tr2Direction ? `TR2_SW_DD_${tr2Direction.toUpperCase()}` : normalized;
+}
+
 const columns: Array<{
   key: keyof FieldRow;
   label: string;
@@ -161,7 +167,7 @@ function App() {
     setNotice(null);
     try {
       const path = await invoke<string | null>("choose_export_path", {
-        defaultName: `${result.rootName}_字段表.xlsx`,
+        defaultName: `${fieldTableExportStem(result.rootName)}.xlsx`,
       });
       if (!path) {
         setBusy(null);
