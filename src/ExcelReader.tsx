@@ -21,6 +21,7 @@ import {
   FolderOpen,
   Highlighter,
   LoaderCircle,
+  Palette,
   PanelLeftClose,
   PanelLeftOpen,
   Rows3,
@@ -48,11 +49,15 @@ type ExcelSheet = {
 type ExcelDocument = { fileName: string; sourcePath: string; sheets: ExcelSheet[]; warnings: string[] };
 type SearchMatch = { rowNumber: number; column: number };
 type SidebarTab = "outline" | "search";
+type ReaderTheme = "paper" | "ocean" | "mint" | "night";
 type Props = { onClose: () => void; standalone?: boolean };
 
 const PAGE_SIZE = 400;
 const SIDEBAR_MIN = 220;
 const SIDEBAR_MAX = 620;
+const DEFAULT_READER_ZOOM = 180;
+const MIN_READER_ZOOM = 90;
+const MAX_READER_ZOOM = 240;
 
 export default function ExcelReader({ onClose, standalone = false }: Props) {
   const [documentData, setDocumentData] = useState<ExcelDocument | null>(null);
@@ -70,6 +75,7 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
   const [searchCursor, setSearchCursor] = useState(-1);
   const [page, setPage] = useState(0);
   const [zoom, setZoom] = useState(readReaderZoom);
+  const [readerTheme, setReaderTheme] = useState<ReaderTheme>(readReaderTheme);
   const [wrap, setWrap] = useState(true);
   const [compact, setCompact] = useState(false);
   const [syntaxHighlight, setSyntaxHighlight] = useState(readSyntaxHighlight);
@@ -227,8 +233,12 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
   }, [sidebarWidth]);
 
   useEffect(() => {
-    window.localStorage.setItem("structsheet.reader.zoom", String(zoom));
+    window.localStorage.setItem("structsheet.reader.zoom.v2", String(zoom));
   }, [zoom]);
+
+  useEffect(() => {
+    window.localStorage.setItem("structsheet.reader.theme", readerTheme);
+  }, [readerTheme]);
 
   useEffect(() => {
     window.localStorage.setItem("structsheet.reader.syntaxHighlight", String(syntaxHighlight));
@@ -408,12 +418,11 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
 
   const workspaceStyle = {
     gridTemplateColumns: sidebarOpen ? `${sidebarWidth}px 6px minmax(0, 1fr)` : "0 0 minmax(0, 1fr)",
-    "--reader-font-scale": String(zoom / 100),
   } as CSSProperties;
 
   return (
     <div className={`reader-backdrop ${standalone ? "is-standalone" : ""}`}>
-      <section className="excel-reader" role="dialog" aria-modal={!standalone} aria-label="Excel 文档阅读器">
+      <section className={`excel-reader reader-theme-${readerTheme}`} role="dialog" aria-modal={!standalone} aria-label="Excel 文档阅读器">
         <header className="reader-header">
           <div className="reader-title">
             <div className="tool-icon"><BookOpenText size={21} /></div>
@@ -559,9 +568,18 @@ export default function ExcelReader({ onClose, standalone = false }: Props) {
                 </div>
                 <div className="toolbar-separator" />
                 <span className="font-size-label"><Type size={14} />阅读字号</span>
-                <button className="reader-tool-icon" title="缩小字体" onClick={() => setZoom(Math.max(90, zoom - 10))}><ZoomOut size={15} /></button>
-                <button className="zoom-value" title="恢复默认 120%" onClick={() => setZoom(120)}>{zoom}%</button>
-                <button className="reader-tool-icon" title="增大字体" onClick={() => setZoom(Math.min(180, zoom + 10))}><ZoomIn size={15} /></button>
+                <button className="reader-tool-icon" title="缩小正文字体" onClick={() => setZoom(Math.max(MIN_READER_ZOOM, zoom - 10))}><ZoomOut size={15} /></button>
+                <button className="zoom-value" title={`恢复默认 ${DEFAULT_READER_ZOOM}%`} onClick={() => setZoom(DEFAULT_READER_ZOOM)}>{zoom}%</button>
+                <button className="reader-tool-icon" title="增大正文字体" onClick={() => setZoom(Math.min(MAX_READER_ZOOM, zoom + 10))}><ZoomIn size={15} /></button>
+                <label className="reader-theme-picker" title="选择阅读区主题配色">
+                  <Palette size={14} /><span>主题</span>
+                  <select value={readerTheme} onChange={(event) => setReaderTheme(event.target.value as ReaderTheme)}>
+                    <option value="paper">护眼米白</option>
+                    <option value="ocean">清爽蓝</option>
+                    <option value="mint">柔和绿</option>
+                    <option value="night">夜间深色</option>
+                  </select>
+                </label>
                 <button className={`reader-tool-button ${syntaxHighlight ? "active" : ""}`} title="突出显示标签、引用、关键词、类型和数字" onClick={() => setSyntaxHighlight(!syntaxHighlight)}><Highlighter size={15} />语法高亮</button>
                 <button className={`reader-tool-icon ${wrap ? "active" : ""}`} title="自动换行" onClick={() => setWrap(!wrap)}><WrapText size={16} /></button>
                 <button className={`reader-tool-icon ${compact ? "active" : ""}`} title="紧凑行高" onClick={() => setCompact(!compact)}><Rows3 size={16} /></button>
@@ -734,8 +752,13 @@ function readSidebarWidth() {
 }
 
 function readReaderZoom() {
-  const stored = Number(window.localStorage.getItem("structsheet.reader.zoom"));
-  return Number.isFinite(stored) && stored >= 90 && stored <= 180 ? stored : 120;
+  const stored = Number(window.localStorage.getItem("structsheet.reader.zoom.v2"));
+  return Number.isFinite(stored) && stored >= MIN_READER_ZOOM && stored <= MAX_READER_ZOOM ? stored : DEFAULT_READER_ZOOM;
+}
+
+function readReaderTheme(): ReaderTheme {
+  const stored = window.localStorage.getItem("structsheet.reader.theme");
+  return stored === "ocean" || stored === "mint" || stored === "night" ? stored : "paper";
 }
 
 function readSyntaxHighlight() {
