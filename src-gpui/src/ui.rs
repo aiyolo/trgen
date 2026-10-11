@@ -170,6 +170,12 @@ impl ReaderPrefs {
     }
 }
 
+#[derive(Clone, Copy)]
+struct TitleDrag {
+    start_x: f32,
+    start_y: f32,
+}
+
 struct StructSheet {
     focus_handle: FocusHandle,
     page: Page,
@@ -206,6 +212,7 @@ struct StructSheet {
     column_widths: Vec<f32>,
     dragging_column: Option<(usize, gpui::Pixels, f32)>,
     dragging_sidebar: Option<(gpui::Pixels, f32)>,
+    dragging_title: Option<TitleDrag>,
     reader_scroll: ScrollHandle,
     pending_scroll_column: Option<usize>,
     visible_columns: Vec<bool>,
@@ -308,6 +315,7 @@ impl StructSheet {
             column_widths: Vec::new(),
             dragging_column: None,
             dragging_sidebar: None,
+            dragging_title: None,
             reader_scroll: ScrollHandle::new(),
             pending_scroll_column: None,
             visible_columns: Vec::new(),
@@ -898,7 +906,7 @@ impl StructSheet {
             )
     }
 
-    fn render_title_bar(&self, window: &Window) -> impl IntoElement {
+    fn render_title_bar(&self, window: &Window, cx: &mut Context<Self>) -> impl IntoElement {
         let title = if self.page == Page::Reader {
             "StructSheet · Excel 阅读器"
         } else {
@@ -922,7 +930,12 @@ impl StructSheet {
                     .h_full()
                     .flex_1()
                     .px_3()
-                    .window_control_area(WindowControlArea::Drag)
+                    .on_mouse_down(
+                        gpui::MouseButton::Left,
+                        cx.listener(|this, event: &gpui::MouseDownEvent, window, _| {
+                            this.dragging_title = title_drag_start(window, event.position);
+                        }),
+                    )
                     .text_size(px(12.0))
                     .font_weight(gpui::FontWeight::BOLD)
                     .child(
@@ -1849,23 +1862,31 @@ impl Render for StructSheet {
                     cx.notify();
                 }
             }))
-            .on_mouse_move(cx.listener(|this, event: &gpui::MouseMoveEvent, _, cx| {
-                if let Some((column, start_x, start_width)) = this.dragging_column {
-                    if let Some(width) = this.column_widths.get_mut(column) {
-                        *width = (start_width + f32::from(event.position.x - start_x))
-                            .clamp(64.0, 760.0);
+            .on_mouse_move(
+                cx.listener(|this, event: &gpui::MouseMoveEvent, window, cx| {
+                    if let Some(drag) = this.dragging_title {
+                        title_drag_update(window, drag, event.position);
+                    }
+                    if let Some((column, start_x, start_width)) = this.dragging_column {
+                        if let Some(width) = this.column_widths.get_mut(column) {
+                            *width = (start_width + f32::from(event.position.x - start_x))
+                                .clamp(64.0, 760.0);
+                            cx.notify();
+                        }
+                    }
+                    if let Some((start_x, start_width)) = this.dragging_sidebar {
+                        this.sidebar_width = (start_width + f32::from(event.position.x - start_x))
+                            .clamp(220.0, 620.0);
                         cx.notify();
                     }
-                }
-                if let Some((start_x, start_width)) = this.dragging_sidebar {
-                    this.sidebar_width =
-                        (start_width + f32::from(event.position.x - start_x)).clamp(220.0, 620.0);
-                    cx.notify();
-                }
-            }))
+                }),
+            )
             .on_mouse_up(
                 gpui::MouseButton::Left,
                 cx.listener(|this, _, _, _| {
+                    if this.dragging_title.take().is_some() {
+                        title_drag_end();
+                    }
                     this.dragging_column = None;
                     if this.dragging_sidebar.is_some() {
                         this.save_reader_prefs();
@@ -1885,7 +1906,7 @@ impl Render for StructSheet {
             } else {
                 0x28271f
             }))
-            .child(self.render_title_bar(window))
+            .child(self.render_title_bar(window, cx))
             .child(if self.page == Page::Reader {
                 self.render_reader_toolbar(cx).into_any_element()
             } else {
@@ -2604,6 +2625,96 @@ fn toggle_maximize(window: &mut Window) {
     }
     #[cfg(not(target_os = "windows"))]
     window.zoom_window();
+}
+
+#[cfg(target_os = "windows")]
+#[repr(C)]
+struct NativeRect {
+    left: i32,
+    top: i32,
+    right: i32,
+    bottom: i32,
+}
+
+#[cfg(target_os = "windows")]
+fn native_hwnd(window: &Window) -> Option<*mut std::ffi::c_void> {
+    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+    let handle = HasWindowHandle::window_handle(window).ok()?;
+    match handle.as_raw() {
+        RawWindowHandle::Win32(handle) => Some(handle.hwnd.get() as *mut std::ffi::c_void),
+        _ => None,
+    }
+}
+
+fn title_drag_start(window: &Window, position: gpui::Point<gpui::Pixels>) -> Option<TitleDrag> {
+    #[cfg(target_os = "windows")]
+    {
+        #[link(name = "user32")]
+        extern "system" {
+            fn SetCapture(hwnd: *mut std::ffi::c_void) -> *mut std::ffi::c_void;
+        }
+        let hwnd = native_hwnd(window)?;
+        unsafe { SetCapture(hwnd) };
+        Some(TitleDrag {
+            start_x: f32::from(position.x),
+            start_y: f32::from(position.y),
+        })
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = position;
+        window.start_window_move();
+        None
+    }
+}
+
+fn title_drag_update(window: &Window, drag: TitleDrag, position: gpui::Point<gpui::Pixels>) {
+    #[cfg(target_os = "windows")]
+    {
+        #[link(name = "user32")]
+        extern "system" {
+            fn GetWindowRect(hwnd: *mut std::ffi::c_void, rect: *mut NativeRect) -> i32;
+            fn SetWindowPos(
+                hwnd: *mut std::ffi::c_void,
+                after: *mut std::ffi::c_void,
+                x: i32,
+                y: i32,
+                width: i32,
+                height: i32,
+                flags: u32,
+            ) -> i32;
+        }
+        if let Some(hwnd) = native_hwnd(window) {
+            let mut rect = NativeRect {
+                left: 0,
+                top: 0,
+                right: 0,
+                bottom: 0,
+            };
+            unsafe {
+                if GetWindowRect(hwnd, &mut rect) != 0 {
+                    let dx = (f32::from(position.x) - drag.start_x) * window.scale_factor();
+                    let dy = (f32::from(position.y) - drag.start_y) * window.scale_factor();
+                    let x = rect.left + dx.round() as i32;
+                    let y = rect.top + dy.round() as i32;
+                    SetWindowPos(hwnd, std::ptr::null_mut(), x, y, 0, 0, 0x0015);
+                }
+            }
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    let _ = (window, drag, position);
+}
+
+fn title_drag_end() {
+    #[cfg(target_os = "windows")]
+    {
+        #[link(name = "user32")]
+        extern "system" {
+            fn ReleaseCapture() -> i32;
+        }
+        unsafe { ReleaseCapture() };
+    }
 }
 
 pub fn run() {
