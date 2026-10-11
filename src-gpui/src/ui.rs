@@ -9,7 +9,7 @@ use gpui::{
 };
 use gpui_component::{
     input::{Input, InputState},
-    scroll::ScrollableElement,
+    scroll::{ScrollableElement, Scrollbar, ScrollbarShow},
     select::{Select, SelectEvent, SelectState},
     Root, TitleBar,
 };
@@ -213,6 +213,7 @@ struct StructSheet {
     dragging_column: Option<(usize, gpui::Pixels, f32)>,
     dragging_sidebar: Option<(gpui::Pixels, f32)>,
     dragging_title: Option<TitleDrag>,
+    preview_scroll: ScrollHandle,
     reader_scroll: ScrollHandle,
     pending_scroll_column: Option<usize>,
     visible_columns: Vec<bool>,
@@ -317,6 +318,7 @@ impl StructSheet {
             dragging_column: None,
             dragging_sidebar: None,
             dragging_title: None,
+            preview_scroll: ScrollHandle::new(),
             reader_scroll: ScrollHandle::new(),
             pending_scroll_column: None,
             visible_columns: Vec::new(),
@@ -1081,91 +1083,111 @@ impl StructSheet {
                         div()
                             .flex_1()
                             .min_h_0()
-                            .overflow_scrollbar()
+                            .min_w_0()
+                            .relative()
                             .bg(rgb(0xffffff))
                             .border_1()
                             .border_color(rgb(0xdcd8cc))
                             .child(
                                 div()
-                                    .w_full()
-                                    .h_full()
-                                    .min_w(px(if result.is_some() { 1530.0 } else { 0.0 }))
-                                    .flex()
-                                    .flex_col()
-                                    .children(result.map(|_| {
-                                        field_row(
-                                            [
-                                                "Status",
-                                                "Parameter Name",
-                                                "System Parameter Name",
-                                                "Data Type",
-                                                "Data Size",
-                                                "InIOBuffer",
-                                                "IOBufferOffset",
-                                                "Comments",
-                                            ],
-                                            true,
-                                            false,
-                                        )
-                                    }))
-                                    .children(result.is_none().then(|| {
+                                    .id("struct-preview-scroll")
+                                    .size_full()
+                                    .track_scroll(&self.preview_scroll)
+                                    .overflow_scroll()
+                                    .child(
                                         div()
-                                            .p_5()
                                             .w_full()
                                             .h_full()
+                                            .min_w(px(if result.is_some() { 1530.0 } else { 0.0 }))
                                             .flex()
                                             .flex_col()
-                                            .items_center()
-                                            .justify_center()
-                                            .gap_2()
-                                            .child(
-                                                div()
-                                                    .w(px(64.0))
-                                                    .h(px(64.0))
-                                                    .flex()
-                                                    .items_center()
-                                                    .justify_center()
-                                                    .bg(rgb(0xefede6))
-                                                    .border_1()
-                                                    .border_color(rgb(0xdcd8cc))
-                                                    .text_size(px(26.0))
-                                                    .text_color(rgb(0x737169))
-                                                    .child("{ }"),
-                                            )
-                                            .child(panel_title(if self.error {
-                                                "解析没有完成"
-                                            } else {
-                                                "等待解析"
-                                            }))
-                                            .child(if self.error {
-                                                self.status.clone()
-                                            } else {
-                                                "粘贴头文件后点击“解析结构体”。".into()
-                                            })
-                                    }))
-                                    .children(
-                                        result
-                                            .into_iter()
-                                            .flat_map(|r| r.rows.iter())
-                                            .enumerate()
-                                            .map(|(i, row)| {
+                                            .children(result.map(|_| {
                                                 field_row(
                                                     [
-                                                        row.status.as_str(),
-                                                        row.parameter_name.as_str(),
-                                                        row.system_parameter_name.as_str(),
-                                                        row.data_type.as_str(),
-                                                        &row.data_size.to_string(),
-                                                        row.in_io_buffer.as_str(),
-                                                        &row.io_buffer_offset.to_string(),
-                                                        row.comments.as_str(),
+                                                        "Status",
+                                                        "Parameter Name",
+                                                        "System Parameter Name",
+                                                        "Data Type",
+                                                        "Data Size",
+                                                        "InIOBuffer",
+                                                        "IOBufferOffset",
+                                                        "Comments",
                                                     ],
+                                                    true,
                                                     false,
-                                                    i % 2 == 0,
                                                 )
-                                            }),
+                                            }))
+                                            .children(result.is_none().then(|| {
+                                                div()
+                                                    .p_5()
+                                                    .w_full()
+                                                    .h_full()
+                                                    .flex()
+                                                    .flex_col()
+                                                    .items_center()
+                                                    .justify_center()
+                                                    .gap_2()
+                                                    .child(
+                                                        div()
+                                                            .w(px(64.0))
+                                                            .h(px(64.0))
+                                                            .flex()
+                                                            .items_center()
+                                                            .justify_center()
+                                                            .bg(rgb(0xefede6))
+                                                            .border_1()
+                                                            .border_color(rgb(0xdcd8cc))
+                                                            .text_size(px(26.0))
+                                                            .text_color(rgb(0x737169))
+                                                            .child("{ }"),
+                                                    )
+                                                    .child(panel_title(if self.error {
+                                                        "解析没有完成"
+                                                    } else {
+                                                        "等待解析"
+                                                    }))
+                                                    .child(if self.error {
+                                                        self.status.clone()
+                                                    } else {
+                                                        "粘贴头文件后点击“解析结构体”。".into()
+                                                    })
+                                            }))
+                                            .children(
+                                                result
+                                                    .into_iter()
+                                                    .flat_map(|r| r.rows.iter())
+                                                    .enumerate()
+                                                    .map(|(i, row)| {
+                                                        field_row(
+                                                            [
+                                                                row.status.as_str(),
+                                                                row.parameter_name.as_str(),
+                                                                row.system_parameter_name.as_str(),
+                                                                row.data_type.as_str(),
+                                                                &row.data_size.to_string(),
+                                                                row.in_io_buffer.as_str(),
+                                                                &row.io_buffer_offset.to_string(),
+                                                                row.comments.as_str(),
+                                                            ],
+                                                            false,
+                                                            i % 2 == 0,
+                                                        )
+                                                    }),
+                                            ),
                                     ),
-                            ),
+                            )
+                            .children(result.map(|_| {
+                                div()
+                                    .absolute()
+                                    .top_0()
+                                    .left_0()
+                                    .right_0()
+                                    .bottom_0()
+                                    .child(
+                                        Scrollbar::new(&self.preview_scroll)
+                                            .scrollbar_show(ScrollbarShow::Always),
+                                    )
+                            })),
                     )
                     .children(
                         result
