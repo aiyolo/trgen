@@ -3,9 +3,9 @@ use base64::Engine as _;
 use gpui::prelude::*;
 use gpui::{
     div, img, point, px, rgb, size, App, Application, Bounds, ClickEvent, ClipboardItem, Context,
-    ElementId, Entity, FocusHandle, HighlightStyle, Image, ImageFormat, IntoElement, Render,
-    ScrollHandle, SharedString, StatefulInteractiveElement, StyledImage, StyledText, Subscription,
-    Window, WindowBounds, WindowControlArea, WindowOptions,
+    ElementId, Entity, FocusHandle, FontFallbacks, HighlightStyle, Image, ImageFormat, IntoElement,
+    Render, ScrollHandle, SharedString, StatefulInteractiveElement, StyledImage, StyledText,
+    Subscription, Window, WindowBounds, WindowControlArea, WindowOptions,
 };
 use gpui_component::{
     input::{Input, InputState},
@@ -1894,6 +1894,7 @@ impl Render for StructSheet {
             } else {
                 0x28271f
             }))
+            .font(ui_font())
             .child(self.render_title_bar(window, cx))
             .child(if self.page == Page::Reader {
                 self.render_reader_toolbar(cx).into_any_element()
@@ -2571,6 +2572,15 @@ fn app_icon() -> Arc<Image> {
     .clone()
 }
 
+fn ui_font() -> gpui::Font {
+    let mut font = gpui::font("Segoe UI");
+    font.fallbacks = Some(FontFallbacks::from_fonts(vec![
+        "Microsoft YaHei UI".into(),
+        "Microsoft YaHei".into(),
+    ]));
+    font
+}
+
 fn title_control(label: &'static str, area: WindowControlArea) -> impl IntoElement {
     div()
         .id(label)
@@ -2759,6 +2769,7 @@ fn title_drag_end() {
 pub fn run() {
     Application::new().run(|cx: &mut App| {
         gpui_component::init(cx);
+        gpui_component::theme::Theme::global_mut(cx).font_family = "Segoe UI".into();
         let mut code_theme = (*gpui_component::highlighter::HighlightTheme::default_dark()).clone();
         code_theme.style.editor_background = Some(rgb(0x25251f).into());
         code_theme.style.editor_foreground = Some(rgb(0xf5f2e8).into());
