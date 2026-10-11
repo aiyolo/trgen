@@ -1975,13 +1975,27 @@ impl Render for StructSheet {
                                                     .child(panel_title("表格转 X-Macro")),
                                             ),
                                     )
-                                    .child(button(
-                                        "×",
-                                        cx.listener(|this, _, _, cx| {
-                                            this.macro_open = false;
-                                            cx.notify();
-                                        }),
-                                    )),
+                                    .child(
+                                        div()
+                                            .id("macro-close")
+                                            .px_3()
+                                            .py_2()
+                                            .bg(rgb(0xffffff))
+                                            .text_color(rgb(0x28271f))
+                                            .border_1()
+                                            .border_color(rgb(0xdcd8cc))
+                                            .cursor_pointer()
+                                            .text_size(px(12.0))
+                                            .child("×")
+                                            .on_mouse_down(
+                                                gpui::MouseButton::Left,
+                                                cx.listener(|this, _, _, cx| {
+                                                    this.macro_open = false;
+                                                    cx.stop_propagation();
+                                                    cx.notify();
+                                                }),
+                                            ),
+                                    ),
                             )
                             .child(self.render_macro(cx)),
                     )
@@ -2573,7 +2587,7 @@ fn app_icon() -> Arc<Image> {
 }
 
 fn ui_font() -> gpui::Font {
-    let mut font = gpui::font("Segoe UI");
+    let mut font = gpui::font("Noto Sans SC");
     font.fallbacks = Some(FontFallbacks::from_fonts(vec![
         "Microsoft YaHei UI".into(),
         "Microsoft YaHei".into(),
@@ -2769,7 +2783,7 @@ fn title_drag_end() {
 pub fn run() {
     Application::new().run(|cx: &mut App| {
         gpui_component::init(cx);
-        gpui_component::theme::Theme::global_mut(cx).font_family = "Segoe UI".into();
+        gpui_component::theme::Theme::global_mut(cx).font_family = "Noto Sans SC".into();
         let mut code_theme = (*gpui_component::highlighter::HighlightTheme::default_dark()).clone();
         code_theme.style.editor_background = Some(rgb(0x25251f).into());
         code_theme.style.editor_foreground = Some(rgb(0xf5f2e8).into());
