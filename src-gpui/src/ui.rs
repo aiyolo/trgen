@@ -22,6 +22,7 @@ use std::{
 
 const SAMPLE: &str = "typedef struct {\n    uint16_t channel;       // 通道编号\n    float voltage;          // 电压值\n    float temperature;      // 温度\n} SensorData;\n\ntypedef struct {\n    uint32_t device_id;     // 设备编号\n    uint8_t status;         // 设备状态\n    SensorData sensors[2];  // 两路传感器\n    char name[16];          // 设备名称\n} DevicePacket;";
 const PAGE_ROWS: usize = 400;
+const PREVIEW_COLUMN_WIDTHS: [f32; 8] = [80.0, 180.0, 210.0, 92.0, 80.0, 90.0, 112.0, 166.0];
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Page {
@@ -1098,7 +1099,11 @@ impl StructSheet {
                                         div()
                                             .w_full()
                                             .h_full()
-                                            .min_w(px(if result.is_some() { 1530.0 } else { 0.0 }))
+                                            .min_w(px(if result.is_some() {
+                                                PREVIEW_COLUMN_WIDTHS.into_iter().sum()
+                                            } else {
+                                                0.0
+                                            }))
                                             .flex()
                                             .flex_col()
                                             .children(result.map(|_| {
@@ -2299,7 +2304,7 @@ fn nav_button(
 }
 
 fn field_row(cells: [&str; 8], header: bool, shaded: bool) -> impl IntoElement {
-    let widths = [105.0, 220.0, 245.0, 145.0, 100.0, 125.0, 150.0, 440.0];
+    let widths = PREVIEW_COLUMN_WIDTHS;
     div()
         .flex()
         .bg(rgb(if header {
@@ -2613,6 +2618,7 @@ fn table_cell(text: String, width: f32, font_size: f32) -> impl IntoElement {
         .border_r_1()
         .border_color(rgb(0xdcd8cc))
         .text_size(px(font_size))
+        .truncate()
         .child(text)
 }
 
