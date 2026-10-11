@@ -5607,6 +5607,7 @@ version = "0.1.0"
 dependencies = [
  "base64",
  "calamine",
+ "embed-resource",
  "gpui",
  "gpui-component",
  "raw-window-handle",

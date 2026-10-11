@@ -818,6 +818,7 @@ impl StructSheet {
                                 },
                                 |window, cx| {
                                     window.set_window_title("StructSheet · Excel 阅读器");
+                                    set_native_window_icon(window);
                                     let view = cx.new(|cx| {
                                         let mut view = StructSheet::new(window, cx);
                                         view.page = Page::Reader;
@@ -938,20 +939,7 @@ impl StructSheet {
                     )
                     .text_size(px(12.0))
                     .font_weight(gpui::FontWeight::BOLD)
-                    .child(
-                        div()
-                            .w(px(17.0))
-                            .h(px(17.0))
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .bg(rgb(0xf4e322))
-                            .child(if self.page == Page::Reader {
-                                "▣"
-                            } else {
-                                "{}"
-                            }),
-                    )
+                    .child(img(app_icon()).w(px(18.0)).h(px(18.0)))
                     .child(title),
             )
             .child(title_control("−", WindowControlArea::Min))
@@ -2572,6 +2560,17 @@ fn table_cell(text: String, width: f32, font_size: f32) -> impl IntoElement {
         .child(text)
 }
 
+fn app_icon() -> Arc<Image> {
+    static ICON: OnceLock<Arc<Image>> = OnceLock::new();
+    ICON.get_or_init(|| {
+        Arc::new(Image::from_bytes(
+            ImageFormat::Png,
+            include_bytes!("../../src-tauri/icons/32x32.png").to_vec(),
+        ))
+    })
+    .clone()
+}
+
 fn title_control(label: &'static str, area: WindowControlArea) -> impl IntoElement {
     div()
         .id(label)
@@ -2645,6 +2644,46 @@ fn native_hwnd(window: &Window) -> Option<*mut std::ffi::c_void> {
         _ => None,
     }
 }
+
+#[cfg(target_os = "windows")]
+fn set_native_window_icon(window: &Window) {
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn GetModuleHandleW(module: *const u16) -> *mut std::ffi::c_void;
+    }
+    #[link(name = "user32")]
+    extern "system" {
+        fn LoadImageW(
+            instance: *mut std::ffi::c_void,
+            name: *const u16,
+            image_type: u32,
+            width: i32,
+            height: i32,
+            flags: u32,
+        ) -> *mut std::ffi::c_void;
+        fn SendMessageW(
+            hwnd: *mut std::ffi::c_void,
+            message: u32,
+            wparam: usize,
+            lparam: isize,
+        ) -> isize;
+    }
+    let Some(hwnd) = native_hwnd(window) else {
+        return;
+    };
+    unsafe {
+        let instance = GetModuleHandleW(std::ptr::null());
+        for (kind, size) in [(0, 16), (1, 32)] {
+            let icon = LoadImageW(instance, 1usize as *const u16, 1, size, size, 0x8000);
+            if !icon.is_null() {
+                SendMessageW(hwnd, 0x80, kind, icon as isize);
+            }
+        }
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn set_native_window_icon(_: &Window) {}
 
 fn title_drag_start(window: &Window, position: gpui::Point<gpui::Pixels>) -> Option<TitleDrag> {
     #[cfg(target_os = "windows")]
@@ -2736,6 +2775,7 @@ pub fn run() {
             },
             |window, cx| {
                 window.set_window_title("StructSheet · C 结构体转 Excel");
+                set_native_window_icon(window);
                 let view = cx.new(|cx| StructSheet::new(window, cx));
                 cx.new(|cx| Root::new(view, window, cx))
             },
