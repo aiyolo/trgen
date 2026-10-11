@@ -5609,6 +5609,7 @@ dependencies = [
  "calamine",
  "gpui",
  "gpui-component",
+ "raw-window-handle",
  "regex",
  "rfd",
  "rust_xlsxwriter",

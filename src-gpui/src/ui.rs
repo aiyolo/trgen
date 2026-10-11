@@ -5,12 +5,13 @@ use gpui::{
     div, img, point, px, rgb, size, App, Application, Bounds, ClickEvent, ClipboardItem, Context,
     ElementId, Entity, FocusHandle, HighlightStyle, Image, ImageFormat, IntoElement, Render,
     ScrollHandle, SharedString, StatefulInteractiveElement, StyledImage, StyledText, Subscription,
-    Window, WindowBounds, WindowOptions,
+    Window, WindowBounds, WindowControlArea, WindowOptions,
 };
 use gpui_component::{
     input::{Input, InputState},
     scroll::ScrollableElement,
-    Root,
+    select::{Select, SelectEvent, SelectState},
+    Root, TitleBar,
 };
 use regex::Regex;
 use std::{
@@ -178,8 +179,8 @@ struct StructSheet {
     clipboard_table: Entity<InputState>,
     reader_search: Entity<InputState>,
     reader_outline_filter: Entity<InputState>,
+    root_select: Entity<SelectState<Vec<String>>>,
     selected_root: Option<String>,
-    root_picker_open: bool,
     catalog: Vec<String>,
     parse_result: Option<parser::ParseResult>,
     macro_path: Option<PathBuf>,
@@ -239,7 +240,16 @@ impl StructSheet {
         let reader_search = cx.new(|cx| InputState::new(window, cx).placeholder("搜索工作表内容"));
         let reader_outline_filter =
             cx.new(|cx| InputState::new(window, cx).placeholder("筛选章节目录"));
+        let root_select = cx.new(|cx| SelectState::new(Vec::<String>::new(), None, window, cx));
         let subscriptions = vec![
+            cx.subscribe(
+                &root_select,
+                |this, _, event: &SelectEvent<Vec<String>>, cx| {
+                    if let SelectEvent::Confirm(Some(name)) = event {
+                        this.parse(Some(name.clone()), cx);
+                    }
+                },
+            ),
             cx.observe(&clipboard_table, |this, input, cx| {
                 if !input.read(cx).value().trim().is_empty() {
                     this.macro_path = None;
@@ -266,8 +276,8 @@ impl StructSheet {
             clipboard_table,
             reader_search,
             reader_outline_filter,
+            root_select,
             selected_root: None,
-            root_picker_open: false,
             catalog: Vec::new(),
             parse_result: None,
             macro_path: None,
@@ -343,7 +353,6 @@ impl StructSheet {
                 let selected = requested.unwrap_or_else(|| catalog.default_root.clone());
                 self.catalog = catalog.available_structs;
                 self.selected_root = Some(selected.clone());
-                self.root_picker_open = false;
                 match parser::parse(&source, Some(&selected)) {
                     Ok(result) => {
                         let count = result.rows.len();
@@ -365,6 +374,19 @@ impl StructSheet {
         }
     }
 
+    fn sync_root_select(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let names = self.catalog.clone();
+        let selected = self.selected_root.clone();
+        self.root_select.update(cx, |select, cx| {
+            select.set_items(names, window, cx);
+            if let Some(name) = selected {
+                select.set_selected_value(&name, window, cx);
+            } else {
+                select.set_selected_index(None, window, cx);
+            }
+        });
+    }
+
     fn import_header(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         cx.spawn_in(window, async move |this, cx| {
             if let Some(file) = rfd::AsyncFileDialog::new()
@@ -378,6 +400,7 @@ impl StructSheet {
                         this.source
                             .update(cx, |input, cx| input.set_value(source, window, cx));
                         this.parse(None, cx);
+                        this.sync_root_select(window, cx);
                     }
                     Err(error) => this.message(format!("读取文件失败：{error}"), true, cx),
                 });
@@ -778,10 +801,11 @@ impl StructSheet {
                     .child(button(
                         "Excel 阅读器",
                         cx.listener(|_, _, _, cx| {
-                            let bounds = Bounds::centered(None, size(px(1450.0), px(900.0)), cx);
+                            let bounds = Bounds::centered(None, size(px(1450.0), px(800.0)), cx);
                             let _ = cx.open_window(
                                 WindowOptions {
                                     window_bounds: Some(WindowBounds::Windowed(bounds)),
+                                    titlebar: Some(TitleBar::title_bar_options()),
                                     ..Default::default()
                                 },
                                 |window, cx| {
@@ -874,6 +898,57 @@ impl StructSheet {
             )
     }
 
+    fn render_title_bar(&self, window: &Window) -> impl IntoElement {
+        let title = if self.page == Page::Reader {
+            "StructSheet · Excel 阅读器"
+        } else {
+            "StructSheet · C 结构体转 Excel"
+        };
+        div()
+            .flex()
+            .items_center()
+            .justify_between()
+            .h(px(34.0))
+            .flex_shrink_0()
+            .bg(rgb(0xfbfaf6))
+            .border_b_1()
+            .border_color(rgb(0xdcd8cc))
+            .child(
+                div()
+                    .id("title-drag")
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .h_full()
+                    .flex_1()
+                    .px_3()
+                    .window_control_area(WindowControlArea::Drag)
+                    .text_size(px(12.0))
+                    .font_weight(gpui::FontWeight::BOLD)
+                    .child(
+                        div()
+                            .w(px(17.0))
+                            .h(px(17.0))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .bg(rgb(0xf4e322))
+                            .child(if self.page == Page::Reader {
+                                "▣"
+                            } else {
+                                "{}"
+                            }),
+                    )
+                    .child(title),
+            )
+            .child(title_control("−", WindowControlArea::Min))
+            .child(title_control(
+                if window.is_maximized() { "❐" } else { "□" },
+                WindowControlArea::Max,
+            ))
+            .child(title_control("×", WindowControlArea::Close))
+    }
+
     fn render_struct(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let result = self.parse_result.as_ref();
         div()
@@ -923,6 +998,7 @@ impl StructSheet {
                                                 input.set_value(SAMPLE, window, cx)
                                             });
                                             this.parse(None, cx);
+                                            this.sync_root_select(window, cx);
                                         }),
                                     )),
                             ),
@@ -939,7 +1015,10 @@ impl StructSheet {
                     )
                     .child(div().flex().justify_end().child(dark_button(
                         "解析结构体",
-                        cx.listener(|this, _, _, cx| this.parse(this.selected_root.clone(), cx)),
+                        cx.listener(|this, _, window, cx| {
+                            this.parse(this.selected_root.clone(), cx);
+                            this.sync_root_select(window, cx);
+                        }),
                     ))),
             )
             .child(
@@ -970,7 +1049,7 @@ impl StructSheet {
                                     .flex()
                                     .items_center()
                                     .gap_3()
-                                    .children(self.selected_root.as_ref().map(|name| {
+                                    .children(self.selected_root.as_ref().map(|_| {
                                         div()
                                             .flex()
                                             .items_center()
@@ -981,13 +1060,11 @@ impl StructSheet {
                                                     .text_color(rgb(0x737169))
                                                     .child("目标结构体"),
                                             )
-                                            .child(button(
-                                                format!("{} ▾", name),
-                                                cx.listener(|this, _, _, cx| {
-                                                    this.root_picker_open = !this.root_picker_open;
-                                                    cx.notify();
-                                                }),
-                                            ))
+                                            .child(
+                                                Select::new(&self.root_select)
+                                                    .w(px(156.0))
+                                                    .text_size(px(12.0)),
+                                            )
                                     }))
                                     .children(result.map(|r| {
                                         div()
@@ -998,21 +1075,6 @@ impl StructSheet {
                                     })),
                             ),
                     )
-                    .children(self.root_picker_open.then(|| {
-                        div().flex().flex_wrap().gap_1().children(
-                            self.catalog.iter().enumerate().map(|(index, name)| {
-                                let selected = self.selected_root.as_ref() == Some(name);
-                                let name_for_click = name.clone();
-                                nav_button(
-                                    format!("{index}: {name}"),
-                                    selected,
-                                    cx.listener(move |this, _, _, cx| {
-                                        this.parse(Some(name_for_click.clone()), cx)
-                                    }),
-                                )
-                            }),
-                        )
-                    }))
                     .child(
                         div()
                             .flex_1()
@@ -1823,6 +1885,7 @@ impl Render for StructSheet {
             } else {
                 0x28271f
             }))
+            .child(self.render_title_bar(window))
             .child(if self.page == Page::Reader {
                 self.render_reader_toolbar(cx).into_any_element()
             } else {
@@ -2488,6 +2551,61 @@ fn table_cell(text: String, width: f32, font_size: f32) -> impl IntoElement {
         .child(text)
 }
 
+fn title_control(label: &'static str, area: WindowControlArea) -> impl IntoElement {
+    div()
+        .id(label)
+        .w(px(46.0))
+        .h_full()
+        .flex()
+        .items_center()
+        .justify_center()
+        .flex_shrink_0()
+        .on_click(move |_, window, _| match area {
+            WindowControlArea::Min => window.minimize_window(),
+            WindowControlArea::Max => toggle_maximize(window),
+            WindowControlArea::Close => window.remove_window(),
+            _ => {}
+        })
+        .text_size(px(17.0))
+        .text_color(rgb(0x28271f))
+        .hover(|style| style.bg(rgb(if label == "×" { 0xe95050 } else { 0xe9e7df })))
+        .child(label)
+}
+
+fn toggle_maximize(window: &mut Window) {
+    if !window.is_maximized() {
+        window.zoom_window();
+        return;
+    }
+    #[cfg(target_os = "windows")]
+    {
+        use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+        if let Ok(handle) = HasWindowHandle::window_handle(window) {
+            if let RawWindowHandle::Win32(handle) = handle.as_raw() {
+                #[link(name = "user32")]
+                extern "system" {
+                    fn PostMessageW(
+                        hwnd: *mut std::ffi::c_void,
+                        message: u32,
+                        wparam: usize,
+                        lparam: isize,
+                    ) -> i32;
+                }
+                unsafe {
+                    PostMessageW(
+                        handle.hwnd.get() as *mut std::ffi::c_void,
+                        0x0112,
+                        0xF120,
+                        0,
+                    )
+                };
+            }
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    window.zoom_window();
+}
+
 pub fn run() {
     Application::new().run(|cx: &mut App| {
         gpui_component::init(cx);
@@ -2502,6 +2620,7 @@ pub fn run() {
         cx.open_window(
             WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
+                titlebar: Some(TitleBar::title_bar_options()),
                 ..Default::default()
             },
             |window, cx| {
