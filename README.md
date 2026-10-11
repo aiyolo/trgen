@@ -1,6 +1,6 @@
 # StructSheet
 
-一个使用 Rust + Tauri 2 构建的桌面工具：输入 C 语言结构体定义，递归展开嵌套字段并导出带格式的 Excel 字段表。
+一个使用 Rust + GPUI 构建的桌面工具：输入 C 语言结构体定义，递归展开嵌套字段并导出带格式的 Excel 字段表。原 Tauri 2 界面保留在 `src/`，可用于界面与功能对照；GPUI 程序位于 `src-gpui/`，直接复用 `src-tauri/src/` 中的 Rust 解析、导出和表格读取代码。
 
 导出 `TR2_DD_IN` / `TR2_DD_OUT` 字段表时，默认文件名会自动规范为 `TR2_SW_DD_IN.xlsx` / `TR2_SW_DD_OUT.xlsx`；其他导出文件也不再附加中文“字段表”后缀。
 
@@ -26,20 +26,27 @@
 
 ## 开发运行
 
-需要 Node.js、Rust 和 Tauri 在 Windows 上所需的 WebView2/编译环境。
+GPUI 版本需要 Rust 和 Windows C++ 构建工具。在项目根目录运行：
 
 ```powershell
-npm.cmd install
-npm.cmd run tauri dev
+cargo run --manifest-path src-gpui/Cargo.toml
 ```
+
+Windows ARM64 开发机若缺少 native `ring` 所需的 Clang，可在 Visual Studio 开发者终端构建 x64 目标：
+
+```powershell
+cargo run --manifest-path src-gpui/Cargo.toml --target x86_64-pc-windows-msvc
+```
+
+原 Tauri 版本仍可使用 `npm.cmd install` 和 `npm.cmd run tauri dev` 启动。
 
 ## 构建
 
 ```powershell
-npm.cmd run tauri build
+cargo build --manifest-path src-gpui/Cargo.toml --release
 ```
 
-构建结果位于 `src-tauri/target/release/bundle/`。
+构建结果位于 `src-gpui/target/release/`。原 Tauri 打包命令为 `npm.cmd run tauri build`。
 
 ## 表格转 X-Macro
 

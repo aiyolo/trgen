@@ -10,55 +10,62 @@ const MAX_COLUMNS: usize = 100;
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExcelDocument {
-    file_name: String,
-    source_path: String,
-    sheets: Vec<ExcelSheet>,
-    warnings: Vec<String>,
+    pub file_name: String,
+    pub source_path: String,
+    pub sheets: Vec<ExcelSheet>,
+    pub warnings: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExcelSheet {
-    name: String,
-    headers: Vec<String>,
-    rows: Vec<ExcelRow>,
-    outline: Vec<OutlineItem>,
-    images: Vec<CellImage>,
-    header_row: usize,
-    total_rows: usize,
-    total_columns: usize,
+    pub name: String,
+    pub headers: Vec<String>,
+    pub rows: Vec<ExcelRow>,
+    pub outline: Vec<OutlineItem>,
+    pub images: Vec<CellImage>,
+    pub header_row: usize,
+    pub total_rows: usize,
+    pub total_columns: usize,
 }
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExcelRow {
-    row_number: usize,
-    cells: Vec<String>,
+    pub row_number: usize,
+    pub cells: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OutlineItem {
-    row_number: usize,
-    number: String,
-    title: String,
-    level: usize,
+    pub row_number: usize,
+    pub number: String,
+    pub title: String,
+    pub level: usize,
 }
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CellImage {
-    row: usize,
-    column: usize,
-    name: String,
-    mime_type: String,
-    data_url: String,
+    pub row: usize,
+    pub column: usize,
+    pub name: String,
+    pub mime_type: String,
+    pub data_url: String,
 }
 
 pub fn read_document(raw_path: &str) -> Result<ExcelDocument, String> {
     let path = Path::new(raw_path.trim());
     if !path.is_file() {
         return Err("请选择有效的 Excel 文件。".to_string());
+    }
+    if path
+        .extension()
+        .and_then(|value| value.to_str())
+        .is_some_and(|value| value.eq_ignore_ascii_case("csv"))
+    {
+        return read_csv_document(path);
     }
 
     let mut workbook = open_workbook_auto(path)
@@ -202,6 +209,70 @@ pub fn read_document(raw_path: &str) -> Result<ExcelDocument, String> {
             .to_string(),
         source_path: path.to_string_lossy().into_owned(),
         sheets,
+        warnings,
+    })
+}
+
+fn read_csv_document(path: &Path) -> Result<ExcelDocument, String> {
+    let content = std::fs::read_to_string(path)
+        .map_err(|error| format!("无法读取 CSV 文件，请确认文件使用 UTF-8 编码：{error}"))?;
+    let first_line = content.lines().next().unwrap_or("");
+    let delimiter = ['\t', ',', ';']
+        .into_iter()
+        .max_by_key(|candidate| first_line.matches(*candidate).count())
+        .unwrap_or(',');
+    let mut raw_rows = crate::table_xmacro::parse_delimited(&content, delimiter);
+    if raw_rows.is_empty() {
+        return Err("CSV 文件没有可读取的数据。".to_string());
+    }
+    let total_rows = raw_rows.len();
+    let total_columns = raw_rows
+        .iter()
+        .map(Vec::len)
+        .max()
+        .unwrap_or(0)
+        .min(MAX_COLUMNS);
+    let mut warnings = Vec::new();
+    if total_rows > MAX_ROWS {
+        warnings.push(format!("CSV 有 {total_rows} 行，仅显示前 {MAX_ROWS} 行。"));
+    }
+    if raw_rows.iter().any(|row| row.len() > MAX_COLUMNS) {
+        warnings.push(format!("CSV 列数较多，仅显示前 {MAX_COLUMNS} 列。"));
+    }
+    let rows = raw_rows
+        .drain(..)
+        .take(MAX_ROWS)
+        .enumerate()
+        .map(|(index, mut cells)| {
+            cells.truncate(total_columns);
+            cells.resize(total_columns, String::new());
+            ExcelRow {
+                row_number: index + 1,
+                cells,
+            }
+        })
+        .collect::<Vec<_>>();
+    let header_row = detect_header(&rows);
+    let headers = build_headers(&rows, header_row, total_columns);
+    let outline = build_outline(&rows, header_row);
+    let file_name = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("CSV 文档")
+        .to_string();
+    Ok(ExcelDocument {
+        file_name: file_name.clone(),
+        source_path: path.to_string_lossy().into_owned(),
+        sheets: vec![ExcelSheet {
+            name: file_name,
+            headers,
+            rows,
+            outline,
+            images: Vec::new(),
+            header_row,
+            total_rows,
+            total_columns,
+        }],
         warnings,
     })
 }
@@ -451,6 +522,20 @@ mod tests {
         assert_eq!(image.row, 3);
         assert_eq!(image.column, 1);
         assert!(image.data_url.starts_with("data:image/png;base64,"));
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn reads_csv_and_builds_outline() {
+        let path = temp_path("csv");
+        fs::write(
+            &path,
+            "ID,标题编号,需求内容/entrycontent\n1,1,INTRODUCTION\n2,1.1,\"PURPOSE, DETAILS\"\n",
+        )
+        .unwrap();
+        let document = read_document(&path.to_string_lossy()).unwrap();
+        assert_eq!(document.sheets[0].outline.len(), 2);
+        assert_eq!(document.sheets[0].outline[1].title, "PURPOSE, DETAILS");
         fs::remove_file(path).unwrap();
     }
 }

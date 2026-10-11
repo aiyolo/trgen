@@ -25,13 +25,13 @@ struct OutputRow {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResultData {
-    source_path: String,
-    sheet_name: String,
-    macro_name: String,
-    struct_name: String,
-    row_count: usize,
-    code: String,
-    warnings: Vec<String>,
+    pub source_path: String,
+    pub sheet_name: String,
+    pub macro_name: String,
+    pub struct_name: String,
+    pub row_count: usize,
+    pub code: String,
+    pub warnings: Vec<String>,
     rows: Vec<OutputRow>,
 }
 
@@ -401,7 +401,7 @@ fn c_identifier(value: &str, uppercase: bool, fallback: &str) -> String {
     output
 }
 
-fn parse_delimited(content: &str, delimiter: char) -> Vec<Vec<String>> {
+pub(crate) fn parse_delimited(content: &str, delimiter: char) -> Vec<Vec<String>> {
     let mut rows = Vec::new();
     let mut row = Vec::new();
     let mut field = String::new();

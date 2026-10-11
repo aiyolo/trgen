@@ -1,0 +1,15 @@
+[package]
+name = "struct-sheet-gpui"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+base64 = "0.22"
+calamine = { version = "0.36.1", features = ["picture"] }
+gpui = "=0.2.2"
+gpui-component = "=0.5.1"
+rfd = "0.15"
+regex = "1"
+rust_xlsxwriter = "0.90"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
