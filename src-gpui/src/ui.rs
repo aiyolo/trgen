@@ -22,7 +22,8 @@ use std::{
 
 const SAMPLE: &str = "typedef struct {\n    uint16_t channel;       // 通道编号\n    float voltage;          // 电压值\n    float temperature;      // 温度\n} SensorData;\n\ntypedef struct {\n    uint32_t device_id;     // 设备编号\n    uint8_t status;         // 设备状态\n    SensorData sensors[2];  // 两路传感器\n    char name[16];          // 设备名称\n} DevicePacket;";
 const PAGE_ROWS: usize = 400;
-const PREVIEW_COLUMN_WIDTHS: [f32; 8] = [80.0, 180.0, 210.0, 92.0, 80.0, 90.0, 112.0, 166.0];
+// Keep the original preview table's column proportions within the compact GPUI viewport.
+const PREVIEW_COLUMN_WIDTHS: [f32; 8] = [56.0, 120.0, 145.0, 65.0, 60.0, 70.0, 95.0, 105.0];
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Page {
@@ -2307,10 +2308,11 @@ fn field_row(cells: [&str; 8], header: bool, shaded: bool) -> impl IntoElement {
     let widths = PREVIEW_COLUMN_WIDTHS;
     div()
         .flex()
+        .h(px(if header { 37.0 } else { 34.0 }))
         .bg(rgb(if header {
             0xf4e322
         } else if shaded {
-            0xf8f7f2
+            0xfbfaf6
         } else {
             0xffffff
         }))
@@ -2326,22 +2328,32 @@ fn field_row(cells: [&str; 8], header: bool, shaded: bool) -> impl IntoElement {
                         div()
                             .w(px(width))
                             .min_w(px(width))
-                            .p_2()
+                            .h_full()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .p_1()
                             .border_r_1()
                             .border_color(rgb(0xdcd8cc))
                             .child(
                                 div()
-                                    .px_2()
+                                    .px_1()
                                     .py_1()
-                                    .rounded_md()
+                                    .rounded_full()
                                     .bg(rgb(0xe7f5ed))
                                     .text_color(rgb(0x287a5b))
-                                    .text_size(px(11.0))
+                                    .text_size(px(9.0))
+                                    .truncate()
                                     .child(format!("✓ {text}")),
                             )
                             .into_any_element()
                     } else {
-                        table_cell((*text).to_string(), width, 12.0).into_any_element()
+                        table_cell(
+                            (*text).to_string(),
+                            width,
+                            !header && matches!(index, 3..=6),
+                        )
+                        .into_any_element()
                     }
                 }),
         )
@@ -2610,14 +2622,18 @@ fn decode_images(
     decoded
 }
 
-fn table_cell(text: String, width: f32, font_size: f32) -> impl IntoElement {
+fn table_cell(text: String, width: f32, centered: bool) -> impl IntoElement {
     div()
         .w(px(width))
         .min_w(px(width))
-        .p_2()
+        .h_full()
+        .flex()
+        .items_center()
+        .when(centered, |this| this.justify_center())
+        .p_1()
         .border_r_1()
         .border_color(rgb(0xdcd8cc))
-        .text_size(px(font_size))
+        .text_size(px(10.0))
         .truncate()
         .child(text)
 }
