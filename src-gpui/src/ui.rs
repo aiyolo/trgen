@@ -242,6 +242,7 @@ impl StructSheet {
         let clipboard_table = cx.new(|cx| {
             InputState::new(window, cx)
                 .multi_line(true)
+                .soft_wrap(false)
                 .placeholder("粘贴 Excel/WPS 中的单元格，或选择表格文件")
         });
         let reader_search = cx.new(|cx| InputState::new(window, cx).placeholder("搜索工作表内容"));
@@ -1195,6 +1196,7 @@ impl StructSheet {
             .flex_col()
             .flex_1()
             .min_h_0()
+            .min_w_0()
             .bg(rgb(0xfbfaf6))
             .child(
                 div()
@@ -1212,7 +1214,9 @@ impl StructSheet {
                             .child(
                                 div()
                                     .flex_1()
+                                    .min_w_0()
                                     .p_2()
+                                    .truncate()
                                     .bg(rgb(0xffffff))
                                     .border_1()
                                     .border_color(rgb(0xdcd8cc))
@@ -1239,7 +1243,12 @@ impl StructSheet {
                             .text_color(rgb(0x928f83))
                             .child("或直接粘贴 Excel / WPS 单元格"),
                     )
-                    .child(Input::new(&self.clipboard_table).h(px(88.0)))
+                    .child(
+                        Input::new(&self.clipboard_table)
+                            .w_full()
+                            .min_w_0()
+                            .h(px(88.0)),
+                    )
                     .child(
                         div()
                             .flex()
@@ -1248,6 +1257,7 @@ impl StructSheet {
                             .child(
                                 div()
                                     .flex_1()
+                                    .min_w_0()
                                     .flex()
                                     .flex_col()
                                     .gap_1()
@@ -1286,6 +1296,7 @@ impl StructSheet {
                 div()
                     .flex_1()
                     .min_h_0()
+                    .min_w_0()
                     .flex()
                     .flex_col()
                     .gap_2()
@@ -1293,8 +1304,10 @@ impl StructSheet {
                     .child(
                         div()
                             .flex()
+                            .flex_wrap()
                             .items_center()
                             .gap_3()
+                            .min_w_0()
                             .text_size(px(12.0))
                             .child(format!("{} 个字段", result.row_count))
                             .child(format!("工作表：{}", result.sheet_name))
@@ -1313,6 +1326,8 @@ impl StructSheet {
                         div()
                             .flex_1()
                             .min_h_0()
+                            .min_w_0()
+                            .w_full()
                             .overflow_scrollbar()
                             .p_3()
                             .bg(rgb(0xffffff))
@@ -1919,6 +1934,8 @@ impl Render for StructSheet {
                 }),
             )
             .children(self.macro_open.then(|| {
+                let modal_width = (window.bounds().size.width - px(42.0)).min(px(880.0));
+                let modal_height = (window.bounds().size.height - px(48.0)).min(px(710.0));
                 div()
                     .absolute()
                     .top_0()
@@ -1930,10 +1947,12 @@ impl Render for StructSheet {
                     .bg(gpui::rgba(0x24231fa8))
                     .child(
                         div()
-                            .w(px(880.0))
-                            .h(px(710.0))
+                            .w(modal_width)
+                            .h(modal_height)
+                            .min_w_0()
                             .flex()
                             .flex_col()
+                            .overflow_hidden()
                             .bg(rgb(0xfbfaf6))
                             .rounded_md()
                             .border_1()

@@ -57,6 +57,7 @@ cargo build --manifest-path src-gpui/Cargo.toml --release
 代码名称只需填写一次公共部分。例如输入 `EI_TO_HMGPM`，程序会自动生成 `EI_TO_HMGPM_FIELDS` 宏和 `EI_TO_HMGPM_TYPE` 结构体类型。
 
 也可以在 Excel/WPS 中选中包含表头的单元格区域，复制后直接粘贴到“表格转代码”窗口。剪贴板中的制表符和换行会按行列解析，不需要先保存文件。
+粘贴区和生成代码区都支持水平滚动，较宽的表头及代码行无需放大窗口即可查看。
 
 ## Excel 阅读器
 
