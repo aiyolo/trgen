@@ -47,6 +47,39 @@ button {
   min-height: 100vh;
 }
 
+.mygo-titlebar {
+  --app-region: drag;
+  height: var(--mygo-titlebar-height, 34px);
+  padding: 0 var(--mygo-titlebar-inset-right, 140px) 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  color: #28271f;
+  background: #fbfaf6;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.mygo-titlebar img {
+  width: 17px;
+  height: 17px;
+}
+
+.mygo-window .app-shell {
+  min-height: calc(100vh - var(--mygo-titlebar-height, 34px));
+}
+
+.mygo-window .workspace {
+  height: calc(100vh - 116px - var(--mygo-titlebar-height, 34px));
+}
+
+.mygo-window.reader-window .reader-backdrop.is-standalone {
+  top: var(--mygo-titlebar-height, 34px);
+}
+
 .topbar {
   height: 72px;
   padding: 0 clamp(24px, 4vw, 64px);
@@ -517,17 +550,17 @@ main {
 
 table {
   width: 100%;
-  min-width: 1010px;
+  min-width: 670px;
   border-collapse: separate;
   border-spacing: 0;
   table-layout: fixed;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 th,
 td {
   height: 34px;
-  padding: 7px 10px;
+  padding: 7px 4px;
   border-right: 1px solid #dedbd2;
   border-bottom: 1px solid #e4e1d8;
   text-align: left;
@@ -544,39 +577,39 @@ th {
   color: #39372c;
   background: var(--yellow);
   border-color: #d3c600;
-  font: 500 10px "Cascadia Mono", "Consolas", monospace;
+  font: 500 10.5px "Cascadia Mono", "Consolas", monospace;
 }
 
 th:nth-child(1) {
-  width: 80px;
+  width: 52px;
 }
 
 th:nth-child(2) {
-  width: 180px;
+  width: 106px;
 }
 
 th:nth-child(3) {
-  width: 210px;
+  width: 138px;
 }
 
 th:nth-child(4) {
-  width: 92px;
+  width: 60px;
 }
 
 th:nth-child(5) {
-  width: 80px;
+  width: 68px;
 }
 
 th:nth-child(6) {
-  width: 90px;
+  width: 66px;
 }
 
 th:nth-child(7) {
-  width: 112px;
+  width: 92px;
 }
 
 th:nth-child(8) {
-  width: 160px;
+  width: 88px;
 }
 
 tbody tr:nth-child(even) td {
@@ -599,13 +632,13 @@ tbody tr:hover td {
 .status-pill {
   width: fit-content;
   margin: 0 auto;
-  padding: 3px 7px;
-  gap: 4px;
+  padding: 2px 4px;
+  gap: 2px;
   color: #267255;
   background: #e7f5ed;
   border-radius: 999px;
   font-weight: 700;
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .text-button {

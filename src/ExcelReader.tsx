@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "./desktop";
 import {
   BookOpenText,
   ChevronDown,

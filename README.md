@@ -1,6 +1,6 @@
 # StructSheet
 
-一个使用 Rust + GPUI 构建的桌面工具：输入 C 语言结构体定义，递归展开嵌套字段并导出带格式的 Excel 字段表。原 Tauri 2 界面保留在 `src/`，可用于界面与功能对照；GPUI 程序位于 `src-gpui/`，直接复用 `src-tauri/src/` 中的 Rust 解析、导出和表格读取代码。
+一个把 C 语言结构体转换为 Excel 字段表的桌面工具。当前分支新增 MyGo 版本：MyGo 管理桌面窗口、文件对话框和页面调用，React 页面继续提供原有交互，`src-core-cli/` 复用 Rust 解析、导出和表格读取代码。GPUI 版本保留在 `src-gpui/`，Tauri 版本保留在 `src-tauri/`。
 
 导出 `TR2_DD_IN` / `TR2_DD_OUT` 字段表时，默认文件名会自动规范为 `TR2_SW_DD_IN.xlsx` / `TR2_SW_DD_OUT.xlsx`；其他导出文件也不再附加中文“字段表”后缀。
 
@@ -27,6 +27,21 @@
 
 ## 开发运行
 
+MyGo 版本需要 Go 1.27+、Node.js/npm、Rust 工具链和 Windows x64 构建目标。在项目根目录运行：
+
+```powershell
+npm install
+npm run build
+cargo build --manifest-path src-core-cli/Cargo.toml --release --target x86_64-pc-windows-msvc
+go build -ldflags '-H=windowsgui' -o .mygo/StructSheet.exe .
+Copy-Item src-core-cli/target/x86_64-pc-windows-msvc/release/StructSheetCore.exe .mygo/StructSheetCore.exe
+./.mygo/StructSheet.exe
+```
+
+Windows 便携包可通过 `./scripts/build-mygo.ps1` 构建，结果位于 `release/`。两个 EXE 必须放在同一目录。MyGo 的网页窗口在 Windows 10 上需要 WebView2 Runtime。
+
+### 旧版入口
+
 GPUI 版本需要 Rust 和 Windows C++ 构建工具。在项目根目录运行：
 
 ```powershell
@@ -51,7 +66,7 @@ cargo build --manifest-path src-gpui/Cargo.toml --release
 
 ## 表格转 X-Macro
 
-该功能已直接集成在主程序中，无需额外 DLL 或插件目录。
+该功能无需额外 DLL 或插件目录；MyGo 便携包中的 `StructSheetCore.exe` 提供表格解析与代码生成。
 
 字段表至少需要 `Parameter Name`（或“字段名”）和 `Type`（或“数据类型”）两列。`Bytes/Offset` 列支持 `0~3`、`0-3` 或单个偏移值；没有显式 Size 时会按常见 C 类型推断字节数。
 

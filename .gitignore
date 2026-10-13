@@ -3,6 +3,9 @@ dist/
 release/
 src-tauri/target/
 src-gpui/target/
+src-core-cli/target/
+.mygo/
+build/
 *.xlsx
 .idea/
 .vscode/

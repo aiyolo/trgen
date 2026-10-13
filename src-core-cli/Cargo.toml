@@ -1,0 +1,21 @@
+[package]
+name = "structsheet-core-cli"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "StructSheetCore"
+path = "src/main.rs"
+
+[dependencies]
+base64 = "0.22"
+calamine = { version = "0.36.1", features = ["picture"] }
+rust_xlsxwriter = "0.90"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+panic = "abort"
+strip = true
