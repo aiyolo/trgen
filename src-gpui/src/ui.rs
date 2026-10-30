@@ -2652,7 +2652,7 @@ fn app_icon() -> Arc<Image> {
     ICON.get_or_init(|| {
         Arc::new(Image::from_bytes(
             ImageFormat::Png,
-            include_bytes!("../../src-tauri/icons/32x32.png").to_vec(),
+            include_bytes!("../icons/32x32.png").to_vec(),
         ))
     })
     .clone()

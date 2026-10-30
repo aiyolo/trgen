@@ -1,4 +1,4 @@
-1 ICON "../src-tauri/icons/icon.ico"
+1 ICON "icons/icon.ico"
 
 1 VERSIONINFO
 FILEVERSION 0,10,1,0
