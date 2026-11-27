@@ -1,0 +1,35 @@
+{
+  "name": "struct-sheet",
+  "private": true,
+  "version": "0.3.0",
+  "type": "module",
+  "packageManager": "bun@1.4.5",
+  "scripts": {
+    "dev": "bun run --bun vite",
+    "dev:mygo": "go -C src-mygo tool mygo dev",
+    "build": "bun run --bun tsc && bun run --bun vite build",
+    "preview": "bun run --bun vite preview",
+    "test:unit": "bun run --bun vitest run",
+    "check:static": "bun run --bun tsc --noEmit && go -C src-mygo vet",
+    "test:regression": "bun run check:static && go -C src-mygo test ./... && bun run test:unit"
+  },
+  "dependencies": {
+    "lucide-react": "^1.74.0",
+    "mygo-runtime": "^0.10.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/jest-dom": "^8.0.0",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.13",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "jsdom": "^31.0.1",
+    "typescript": "^7",
+    "vite": "^8.4.0",
+    "vitest": "^5.1.2"
+  }
+}

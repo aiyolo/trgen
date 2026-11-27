@@ -1,0 +1,10 @@
+{
+  "name": "StructSheet",
+  "identifier": "com.structsheets.app",
+  "version": "0.3.0",
+  "devUrl": "http://127.0.0.1:1420",
+  "devCommand": "bun run --cwd .. dev --host 127.0.0.1",
+  "buildCommand": "bun run --cwd .. build",
+  "frontendDist": "../dist",
+  "bindings": "../src/lib/mygo/bindings.ts"
+}
