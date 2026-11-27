@@ -1,5 +1,4 @@
-// Package xmacro 把字段表（xlsx/csv/剪贴板）转成 C X-Macro 代码，是
-// src-gpui/src/table_xmacro.rs 的 Go 移植。
+// Package xmacro 把字段表（xlsx/csv/剪贴板）转成 C X-Macro 代码。
 package xmacro
 
 import (

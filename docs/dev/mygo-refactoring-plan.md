@@ -14,8 +14,8 @@ React + TypeScript + Vite，Windows 继续使用系统 WebView2。
   页面自绘标题栏 + `--app-region: drag`、顶栏工具栏、左右分栏面板、模态工具框、
   右下角通知）。
 - 行为等价是交付标准：解析结果（字段行、偏移、大小、分组底色、表头、冻结与
-  自动筛选）必须与 Rust 版逐字段一致，差异以 gold 对照与单测锁定。
-- 迁移期保留 `src-gpui/`（Rust 实现）作为对照与回退；验证通过后再决定移除。
+  自动筛选）与 Rust 版逐字段一致，差异以 gold 对照与单测锁定。
+- 迁移完成后移除 `src-gpui/`（Rust 实现），MyGo 版为唯一入口。
 
 ## 2. 目标架构
 
@@ -106,8 +106,7 @@ cd src-mygo && go tool mygo build -skip-installer
 
 ## 7. 已知差异与后续
 
-- 表格输入格式：Go 版当前支持 `.xlsx`、`.csv` 与剪贴板粘贴；`.xls/.xlsb/.ods`
-  在首版返回明确的中文错误提示，建议另存为 `.xlsx`/`.csv`（`calamine` 的原生
-  多格式支持尚未移植，后续按需补充纯 Go 读取器）。
-- `src-gpui/`（Rust/GPUI）暂保留为对照实现；待 MyGo 版完成真实工作簿回归与
-  发布演练后，再按 tcreader 的收尾流程移除 Rust 后端并切换默认入口。
+- 表格输入格式：Go 版支持 `.xlsx`、`.csv` 与剪贴板粘贴；`.xls/.xlsb/.ods`
+  返回明确的中文错误提示，建议另存为 `.xlsx`/`.csv`（`calamine` 的原生多格式
+  支持未移植，按需再补纯 Go 读取器）。
+- `src-gpui/`（Rust/GPUI）已按 tcreader 收尾流程移除，MyGo 版为唯一入口。

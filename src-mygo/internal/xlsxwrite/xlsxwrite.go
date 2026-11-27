@@ -1,5 +1,5 @@
-// Package xlsxwrite 生成 StructSheet 字段表工作簿。它是 src-gpui/src/excel.rs
-// 的 Go 移植：黄色表头、按结构体分组交替的低饱和底色、边框、冻结首行与自动筛选。
+// Package xlsxwrite 生成 StructSheet 字段表工作簿：黄色表头、按结构体分组交替的
+// 低饱和底色、边框、冻结首行与自动筛选。
 package xlsxwrite
 
 import (
