@@ -1,16 +1,16 @@
 use crate::{excel, parser, table_xmacro};
 use gpui::prelude::*;
 use gpui::{
-    div, img, px, rgb, size, App, Application, Bounds, ClickEvent, ClipboardItem, Context,
-    ElementId, Entity, FocusHandle, FontFallbacks, Image, ImageFormat, IntoElement, Render,
-    ScrollHandle, SharedString, StatefulInteractiveElement, Subscription, Window, WindowBounds,
+    div, img, px, rgb, size, App, Bounds, ClickEvent, ClipboardItem, Context, ElementId, Entity,
+    FocusHandle, FontFallbacks, Image, ImageFormat, IntoElement, Render, ScrollHandle,
+    SharedString, StatefulInteractiveElement, Subscription, Window, WindowBounds,
     WindowControlArea, WindowOptions,
 };
-use gpui_component::{
-    input::{Input, InputState},
-    scroll::{ScrollableElement, Scrollbar, ScrollbarShow},
+use gpui_kit::component::{
+    input::{Editor, EditorState, Input, InputState, Textarea, TextareaState},
+    scroll::{ScrollableElement, Scrollbar},
     select::{Select, SelectEvent, SelectState},
-    Root, TitleBar,
+    TitleBar,
 };
 use std::{
     path::PathBuf,
@@ -19,9 +19,16 @@ use std::{
 
 const SAMPLE: &str = "typedef struct {\n    uint16_t channel;       // 通道编号\n    float voltage;          // 电压值\n    float temperature;      // 温度\n} SensorData;\n\ntypedef struct {\n    uint32_t device_id;     // 设备编号\n    uint8_t status;         // 设备状态\n    SensorData sensors[2];  // 两路传感器\n    char name[16];          // 设备名称\n} DevicePacket;";
 // Match the original preview's column priorities at a compact minimum width.
-const PREVIEW_COLUMN_WIDTHS: [f32; 8] = [52.0, 106.0, 138.0, 60.0, 56.0, 66.0, 92.0, 100.0];
+const PREVIEW_COLUMN_WIDTHS: [f32; 9] = [36.0, 52.0, 106.0, 138.0, 60.0, 56.0, 66.0, 92.0, 100.0];
 
 const APP_VERSION: &str = concat!("v", env!("CARGO_PKG_VERSION"));
+
+// Font scheme follows mature desktop software (Windows 11 Fluent / VS Code /
+// Adobe CN): "Segoe UI Variable Text" for Latin, "Noto Sans SC" (Source Han
+// Sans) for CJK, with "Microsoft YaHei UI" as the system fallback.
+const UI_FONT: &str = "Segoe UI Variable Text";
+const UI_FONT_FALLBACKS: [&str; 3] = ["Noto Sans SC", "Microsoft YaHei UI", "Microsoft YaHei"];
+const MONO_FONT: &str = "Cascadia Mono";
 
 #[derive(Clone, Copy)]
 struct TitleDrag {
@@ -32,9 +39,9 @@ struct TitleDrag {
 struct StructSheet {
     focus_handle: FocusHandle,
     macro_open: bool,
-    source: Entity<InputState>,
+    source: Entity<EditorState>,
     macro_name: Entity<InputState>,
-    clipboard_table: Entity<InputState>,
+    clipboard_table: Entity<TextareaState>,
     root_select: Entity<SelectState<Vec<String>>>,
     selected_root: Option<String>,
     catalog: Vec<String>,
@@ -52,17 +59,16 @@ struct StructSheet {
 impl StructSheet {
     fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let focus_handle = cx.focus_handle();
-        focus_handle.focus(window);
+        focus_handle.focus(window, cx);
         let source = cx.new(|cx| {
-            InputState::new(window, cx)
-                .code_editor("c")
+            EditorState::new(window, cx)
                 .soft_wrap(false)
+                .language("c")
                 .default_value(SAMPLE)
         });
         let macro_name = cx.new(|cx| InputState::new(window, cx).default_value("TABLE"));
         let clipboard_table = cx.new(|cx| {
-            InputState::new(window, cx)
-                .multi_line(true)
+            TextareaState::new(window, cx)
                 .soft_wrap(false)
                 .placeholder("粘贴 Excel/WPS 中的单元格，或选择表格文件")
         });
@@ -465,14 +471,13 @@ impl StructSheet {
                             ),
                     )
                     .child(
-                        Input::new(&self.source)
+                        Editor::new(&self.source)
                             .h_full()
+                            .appearance(false)
                             .bg(rgb(0x25251f))
                             .text_color(rgb(0xf5f2e8))
-                            .text_size(px(12.0))
-                            .font_family("Cascadia Mono")
-                            .border_0()
-                            .rounded_none(),
+                            .font(mono_font())
+                            .text_size(px(12.0)),
                     )
                     .child(div().flex().justify_end().child(dark_button(
                         "解析结构体",
@@ -574,6 +579,7 @@ impl StructSheet {
                                                         "IOBufferOffset",
                                                         "Comments",
                                                     ],
+                                                    None,
                                                     true,
                                                     false,
                                                 )
@@ -630,6 +636,7 @@ impl StructSheet {
                                                                 &row.io_buffer_offset.to_string(),
                                                                 row.comments.as_str(),
                                                             ],
+                                                            Some(i + 1),
                                                             false,
                                                             i % 2 == 0,
                                                         )
@@ -644,10 +651,7 @@ impl StructSheet {
                                     .left_0()
                                     .right_0()
                                     .bottom_0()
-                                    .child(
-                                        Scrollbar::new(&self.preview_scroll)
-                                            .scrollbar_show(ScrollbarShow::Always),
-                                    )
+                                    .child(Scrollbar::new(&self.preview_scroll))
                             })),
                     )
                     .children(
@@ -661,13 +665,7 @@ impl StructSheet {
                                     .text_size(px(12.0))
                                     .child(warning.clone())
                             }),
-                    )
-                    .children(result.map(|_| {
-                        div().flex().justify_end().child(button(
-                            "下载完整表格",
-                            cx.listener(|this, _, _, cx| this.export(cx)),
-                        ))
-                    })),
+                    ),
             )
     }
 
@@ -727,10 +725,10 @@ impl StructSheet {
                             .child("或直接粘贴 Excel / WPS 单元格"),
                     )
                     .child(
-                        Input::new(&self.clipboard_table)
-                            .w_full()
-                            .min_w_0()
-                            .h(px(88.0)),
+                        Textarea::new(&self.clipboard_table)
+                            .h(px(88.0))
+                            .font(mono_font())
+                            .text_size(px(12.0)),
                     )
                     .child(
                         div()
@@ -807,6 +805,7 @@ impl StructSheet {
                     )
                     .child(
                         div()
+                            .id("macro-code-scroll")
                             .flex_1()
                             .min_h_0()
                             .min_w_0()
@@ -816,7 +815,7 @@ impl StructSheet {
                             .bg(rgb(0xffffff))
                             .border_1()
                             .border_color(rgb(0xdcd8cc))
-                            .font_family("Consolas")
+                            .font(mono_font())
                             .text_size(px(12.0))
                             .children(result.code.lines().map(|line| {
                                 div().whitespace_nowrap().child(if line.is_empty() {
@@ -857,13 +856,15 @@ impl Render for StructSheet {
             .track_focus(&self.focus_handle)
             .size_full()
             .relative()
-            .on_key_down(cx.listener(|this, event: &gpui::KeyDownEvent, _window, cx| {
-                if this.macro_open && event.keystroke.key.to_lowercase() == "escape" {
-                    this.macro_open = false;
-                    cx.stop_propagation();
-                    cx.notify();
-                }
-            }))
+            .on_key_down(
+                cx.listener(|this, event: &gpui::KeyDownEvent, _window, cx| {
+                    if this.macro_open && event.keystroke.key.to_lowercase() == "escape" {
+                        this.macro_open = false;
+                        cx.stop_propagation();
+                        cx.notify();
+                    }
+                }),
+            )
             .on_mouse_move(
                 cx.listener(|this, event: &gpui::MouseMoveEvent, window, _cx| {
                     if let Some(drag) = this.dragging_title {
@@ -1070,7 +1071,12 @@ fn disabled_button(label: impl Into<SharedString>) -> impl IntoElement {
         .child(label.into())
 }
 
-fn field_row(cells: [&str; 8], header: bool, shaded: bool) -> impl IntoElement {
+fn field_row(
+    cells: [&str; 8],
+    row_number: Option<usize>,
+    header: bool,
+    shaded: bool,
+) -> impl IntoElement {
     let widths = PREVIEW_COLUMN_WIDTHS;
     div()
         .flex()
@@ -1084,47 +1090,66 @@ fn field_row(cells: [&str; 8], header: bool, shaded: bool) -> impl IntoElement {
         }))
         .border_b_1()
         .border_color(rgb(0xdcd8cc))
-        .children(
-            cells
-                .iter()
-                .enumerate()
-                .zip(widths)
-                .map(|((index, text), width)| {
-                    if index == 0 && !header {
-                        div()
-                            .w(px(width))
-                            .min_w(px(width))
-                            .h_full()
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .p_1()
-                            .border_r_1()
-                            .border_color(rgb(0xdcd8cc))
-                            .child(
-                                div()
-                                    .px_1()
-                                    .py_1()
-                                    .rounded_full()
-                                    .bg(rgb(0xe7f5ed))
-                                    .text_color(rgb(0x287a5b))
-                                    .text_size(px(10.0))
-                                    .truncate()
-                                    .child(format!("✓ {text}")),
-                            )
-                            .into_any_element()
-                    } else {
-                        table_cell(
-                            (*text).to_string(),
-                            width,
-                            header,
-                            !header && matches!(index, 3..=6),
-                            index == 7,
+        .child(number_cell(row_number, header))
+        .children(cells.iter().enumerate().zip(widths.iter().skip(1)).map(
+            |((index, text), width)| {
+                if index == 0 && !header {
+                    div()
+                        .w(px(*width))
+                        .min_w(px(*width))
+                        .h_full()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .p_1()
+                        .border_r_1()
+                        .border_color(rgb(0xdcd8cc))
+                        .child(
+                            div()
+                                .px_1()
+                                .py_1()
+                                .rounded_full()
+                                .bg(rgb(0xe7f5ed))
+                                .text_color(rgb(0x287a5b))
+                                .text_size(px(10.0))
+                                .truncate()
+                                .child(format!("✓ {text}")),
                         )
                         .into_any_element()
-                    }
-                }),
-        )
+                } else {
+                    table_cell(
+                        (*text).to_string(),
+                        *width,
+                        header,
+                        !header && matches!(index, 3..=6),
+                        index == 7,
+                    )
+                    .into_any_element()
+                }
+            },
+        ))
+}
+
+fn number_cell(row_number: Option<usize>, header: bool) -> impl IntoElement {
+    let width = PREVIEW_COLUMN_WIDTHS[0];
+    div()
+        .w(px(width))
+        .min_w(px(width))
+        .flex_shrink_0()
+        .h_full()
+        .flex()
+        .items_center()
+        .justify_center()
+        .border_r_1()
+        .border_color(rgb(0xdcd8cc))
+        .text_size(px(if header { 10.5 } else { 11.5 }))
+        .when(header, |this| this.font_weight(gpui::FontWeight::BOLD))
+        .text_color(rgb(if header { 0x28271f } else { 0x737169 }))
+        .truncate()
+        .child(SharedString::from(match row_number {
+            Some(n) => n.to_string(),
+            None => "#".to_string(),
+        }))
 }
 
 fn table_cell(
@@ -1137,7 +1162,7 @@ fn table_cell(
     div()
         .w(px(width))
         .min_w(px(width))
-        .when(grow, |this| this.flex_grow())
+        .when(grow, |this| this.flex_grow(1.0))
         .h_full()
         .flex()
         .items_center()
@@ -1162,11 +1187,20 @@ fn app_icon() -> Arc<Image> {
 }
 
 fn ui_font() -> gpui::Font {
-    let mut font = gpui::font("Noto Sans SC");
-    font.fallbacks = Some(FontFallbacks::from_fonts(vec![
-        "Microsoft YaHei UI".into(),
-        "Microsoft YaHei".into(),
-    ]));
+    font_with_fallbacks(UI_FONT)
+}
+
+fn mono_font() -> gpui::Font {
+    font_with_fallbacks(MONO_FONT)
+}
+fn font_with_fallbacks(family: &'static str) -> gpui::Font {
+    let mut font = gpui::font(family);
+    font.fallbacks = Some(FontFallbacks::from_fonts(
+        UI_FONT_FALLBACKS
+            .iter()
+            .map(|name| (*name).into())
+            .collect(),
+    ));
     font
 }
 
@@ -1356,28 +1390,29 @@ fn title_drag_end() {
 }
 
 pub fn run() {
-    Application::new().run(|cx: &mut App| {
-        gpui_component::init(cx);
-        gpui_component::theme::Theme::global_mut(cx).font_family = "Noto Sans SC".into();
-        let mut code_theme = (*gpui_component::highlighter::HighlightTheme::default_dark()).clone();
+    gpui_kit::application().run(|cx: &mut App| {
+        gpui_kit::init(cx);
+        gpui_kit::component::theme::Theme::global_mut(cx).font_family = UI_FONT.into();
+        let mut code_theme =
+            (*gpui_kit::component::highlighter::HighlightTheme::default_dark()).clone();
         code_theme.style.editor_background = Some(rgb(0x25251f).into());
         code_theme.style.editor_foreground = Some(rgb(0xf5f2e8).into());
         code_theme.style.editor_active_line = Some(rgb(0x33332c).into());
         code_theme.style.editor_line_number = Some(rgb(0x928f83).into());
         code_theme.style.editor_active_line_number = Some(rgb(0xf4e322).into());
-        gpui_component::theme::Theme::global_mut(cx).highlight_theme = Arc::new(code_theme);
+        gpui_kit::component::theme::Theme::global_mut(cx).highlight_theme = Arc::new(code_theme);
         let bounds = Bounds::centered(None, size(px(1240.0), px(790.0)), cx);
-        cx.open_window(
+        gpui_kit::open_window(
             WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
                 titlebar: Some(TitleBar::title_bar_options()),
                 ..Default::default()
             },
+            cx,
             |window, cx| {
                 window.set_window_title("StructSheet · C 结构体转 Excel");
                 set_native_window_icon(window);
-                let view = cx.new(|cx| StructSheet::new(window, cx));
-                cx.new(|cx| Root::new(view, window, cx))
+                cx.new(|cx| StructSheet::new(window, cx))
             },
         )
         .expect("无法打开 StructSheet 窗口");
