@@ -393,16 +393,6 @@ export function App() {
                     </tbody>
                   </table>
                 </div>
-                <div className="preview-footer">
-                  <button
-                    className="text-button"
-                    disabled={busy !== null}
-                    onClick={() => void exportWorkbook()}
-                  >
-                    <Download size={14} />
-                    下载完整表格
-                  </button>
-                </div>
               </>
             )}
           </div>

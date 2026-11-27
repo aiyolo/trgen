@@ -145,10 +145,8 @@ button {
 .panel-tools,
 .result-meta,
 .source-hint,
-.preview-footer span,
 .button,
 .icon-button,
-.text-button,
 .status-pill {
   display: flex;
   align-items: center;
@@ -217,8 +215,7 @@ button {
 }
 
 .button:disabled,
-.icon-button:disabled,
-.text-button:disabled {
+.icon-button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
@@ -386,8 +383,7 @@ main {
   background: rgba(244, 227, 34, 0.24);
 }
 
-.source-footer,
-.preview-footer {
+.source-footer {
   min-height: 57px;
   flex: none;
   padding: 9px 14px 9px 18px;
@@ -399,8 +395,7 @@ main {
   background: #f8f7f2;
 }
 
-.source-hint,
-.preview-footer span {
+.source-hint {
   gap: 6px;
   color: #88857c;
   font-size: 10px;
@@ -593,21 +588,6 @@ tbody tr:hover td {
   border-radius: 999px;
   font-weight: 700;
   font-size: 9px;
-}
-
-.text-button {
-  padding: 6px 4px;
-  gap: 5px;
-  color: #565349;
-  border: 0;
-  background: transparent;
-  font-size: 10px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.text-button:hover:not(:disabled) {
-  color: #111;
 }
 
 .state-card {
