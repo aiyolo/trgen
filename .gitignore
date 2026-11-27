@@ -3,3 +3,13 @@ src-gpui/target/
 *.xlsx
 .idea/
 .vscode/
+
+# Node / 前端产物
+node_modules/
+dist/
+*.local
+
+# MyGo 构建产物与本地工具
+src-mygo/build/
+src-mygo/dist/
+src-mygo/tools/
