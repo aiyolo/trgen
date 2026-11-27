@@ -1,5 +1,5 @@
-// Package parser 把 C 头文件里的结构体定义解析成字段表行。它是
-// src-gpui/src/parser.rs 的 Go 移植，行为按 64 位 Windows C ABI 对齐。
+// Package parser 把 C 头文件里的结构体定义解析成字段表行，行为按 64 位
+// Windows C ABI 对齐。
 package parser
 
 import (

@@ -2,11 +2,8 @@
 
 一个使用 Go + MyGo（WebView2）构建的桌面工具：输入 C 语言结构体定义，递归展开嵌套
 字段并导出带格式的 Excel 字段表；另含“表格转 X-Macro”工具。React + TypeScript +
-Vite 前端位于仓库根目录，Go 桌面壳与业务后端位于 `src-mygo/`。
-
-> 历史实现：`src-gpui/` 是早期的 Rust + GPUI 版本，功能对齐，作为迁移期对照与
-> 回退保留。现行开发以 MyGo 版为准，见
-> [MyGo 重构方案](docs/dev/mygo-refactoring-plan.md)。
+Vite 前端位于仓库根目录，Go 桌面壳与业务后端位于 `src-mygo/`。重构方案见
+[MyGo 重构方案](docs/dev/mygo-refactoring-plan.md)。
 
 导出 `TR2_DD_IN` / `TR2_DD_OUT` 字段表时，默认文件名会自动规范为
 `TR2_SW_DD_IN.xlsx` / `TR2_SW_DD_OUT.xlsx`；其他导出文件也不再附加中文“字段表”后缀。
@@ -66,16 +63,6 @@ bun run check:static
 # 前端单元测试
 bun run test:unit
 ```
-
-## 历史 GPUI 版本（对照/回退）
-
-```powershell
-cargo run --manifest-path src-gpui/Cargo.toml
-cargo build --manifest-path src-gpui/Cargo.toml --release
-```
-
-构建结果位于 `src-gpui/target/release/`。Windows ARM64 开发机若缺少 native `ring`
-所需的 Clang，可加 `--target x86_64-pc-windows-msvc`。
 
 ## 表格转 X-Macro
 
