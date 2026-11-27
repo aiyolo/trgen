@@ -354,6 +354,9 @@ export function App() {
                   <table>
                     <thead>
                       <tr>
+                        <th key="index" className="index-col">
+                          #
+                        </th>
                         {columns.map((column) => (
                           <th key={column.key}>{column.label}</th>
                         ))}
@@ -362,6 +365,13 @@ export function App() {
                     <tbody>
                       {result.rows.map((row, rowIndex) => (
                         <tr key={`${row.parameterName}-${rowIndex}`}>
+                          <td
+                            key="index"
+                            className="index-col"
+                            aria-label={`第 ${rowIndex + 1} 行`}
+                          >
+                            {rowIndex + 1}
+                          </td>
                           {columns.map((column) => (
                             <td
                               key={column.key}

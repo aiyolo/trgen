@@ -488,7 +488,7 @@ main {
 
 table {
   width: 100%;
-  min-width: 1010px;
+  min-width: 1046px;
   border-collapse: separate;
   border-spacing: 0;
   table-layout: fixed;
@@ -519,35 +519,51 @@ th {
 }
 
 th:nth-child(1) {
-  width: 80px;
+  width: 36px;
 }
 
 th:nth-child(2) {
-  width: 180px;
-}
-
-th:nth-child(3) {
-  width: 210px;
-}
-
-th:nth-child(4) {
-  width: 92px;
-}
-
-th:nth-child(5) {
   width: 80px;
 }
 
+th:nth-child(3) {
+  width: 180px;
+}
+
+th:nth-child(4) {
+  width: 210px;
+}
+
+th:nth-child(5) {
+  width: 92px;
+}
+
 th:nth-child(6) {
-  width: 90px;
+  width: 80px;
 }
 
 th:nth-child(7) {
-  width: 112px;
+  width: 90px;
 }
 
 th:nth-child(8) {
+  width: 112px;
+}
+
+th:nth-child(9) {
   width: 160px;
+}
+
+/* 序号列：窄列、居中、弱化色（对齐 GPUI 版的 number cell） */
+.index-col {
+  text-align: center;
+  color: #737169;
+  font-size: 10px;
+}
+
+th.index-col {
+  color: #39372c;
+  font-weight: 500;
 }
 
 tbody tr:nth-child(even) td {

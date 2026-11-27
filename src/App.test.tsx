@@ -95,6 +95,20 @@ describe("App", () => {
     expect(await screen.findByText("UINT16")).toBeInTheDocument();
   });
 
+  it("shows row numbers in the preview table", async () => {
+    setDesktopForTests(mockDesktop());
+    setSheetsForTests(mockSheets());
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: /解析结构体/ }));
+    await screen.findAllByText("id");
+    expect(await screen.findByText("#")).toBeInTheDocument();
+    const rows = screen.getAllByRole("row");
+    // 1 header + 2 data rows.
+    expect(rows.length).toBe(3);
+    expect(screen.getByLabelText("第 1 行")).toHaveTextContent("1");
+    expect(screen.getByLabelText("第 2 行")).toHaveTextContent("2");
+  });
+
   it("shows parse errors from the backend", async () => {
     setDesktopForTests(mockDesktop());
     setSheetsForTests(
